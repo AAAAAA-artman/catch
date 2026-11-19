@@ -40,6 +40,8 @@ uniform float streak_amount : hint_range(0.0, 0.05) = 0.0018;
 uniform float blur_amount : hint_range(0.0, 0.02) = 0.0028;
 // 模糊从哪里开始（0 = 从中心开始，0.5 = 只糊最外围）
 uniform float blur_start : hint_range(0.0, 1.0) = 0.52;
+// 模糊/水珠的额外倍率（第三阶段「逐渐流泪」用，默认 1 = 不影响负面句效果）
+uniform float blur_boost : hint_range(0.5, 5.0) = 1.0;
 
 // ---------------- 颜色 ----------------
 // 饱和度降低程度
@@ -61,6 +63,7 @@ uniform float droplet_radius : hint_range(0.02, 0.30) = 0.10;
 uniform float droplet_blur_scale : hint_range(1.0, 3.0) = 1.7;
 // 水珠内部的高光强度
 uniform float droplet_highlight : hint_range(0.0, 1.0) = 0.55;
+uniform float droplet_boost : hint_range(0.0, 2.0) = 1.0;
 
 // 时间（脚本推进）
 uniform float time_sec = 0.0;
@@ -108,7 +111,7 @@ void fragment() {
 
 		// ---- 3. 边缘模糊 ----
 		float blur_mask = smoothstep(blur_start, 1.0, dist * 1.42);
-		float radius = blur_amount * strength * blur_mask;
+		float radius = blur_amount * blur_boost * strength * blur_mask;
 		vec3 col;
 		if (radius > 0.0005) {
 			col = blur_sample(sample_uv, radius);
@@ -157,7 +160,7 @@ void fragment() {
 				float rim = smoothstep(dr * 1.05, dr * 0.92, d) * smoothstep(dr * 0.85, dr * 0.98, d);
 				dropletCol *= 1.0 - rim * 0.18 * strength;
 
-				colorAcc = mix(colorAcc, dropletCol, inner * droplet_amount);
+				colorAcc = mix(colorAcc, dropletCol, clamp(inner * droplet_amount * droplet_boost, 0.0, 1.0));
 				totalBlur = max(totalBlur, inner);
 			}
 		}

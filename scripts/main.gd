@@ -92,6 +92,7 @@ var feedback_tween: Tween
 @onready var ambient: Node = $Ambient
 @onready var stress_audio: Node = $StressAudio
 @onready var tears_fx: Control = %TearsFx
+@onready var p3_tears: Control = %Phase3TearsFx
 
 # ---- 剧情流程 ----
 # 五段剧情的统一叫法与 BGM 对应：
@@ -145,6 +146,9 @@ var debug_invincible := false
 # ---- 紧张音：剩余时间少于某个比例时循环播放 ----
 ## 剩余时间 / 总时间 低于这个比例就进"紧张状态"
 const TENSION_RATIO := 0.3
+## 第三阶段：每接受一句话，泪水强度涨多少（模拟逐渐流泪）
+const P3_TEARS_STEP := 0.135
+const P3_TEARS_MAX := 0.95
 
 
 func _ready() -> void:
@@ -357,6 +361,7 @@ func _start_game(mode: String) -> void:
 	_dialog_hidden_p3 = false
 	_phase3_first_round = -1
 	_ending_muted = false
+	_reset_phase3_tears()
 	if tears_fx != null:
 		tears_fx.hide_now()
 	# 恢复对话框位置（上一局第三阶段可能把它移开了）
@@ -789,6 +794,7 @@ func _complete_sentence() -> void:
 	_save_records()
 	_play_circle_result()
 	_notify_phase3_first_done()
+	_build_up_phase3_tears()
 	if sfx_player != null:
 		sfx_player.play_sentence_complete()
 		sfx_player.play_accept(current_kind, pressure, MAX_VALUE)
@@ -1271,6 +1277,27 @@ var _last_input_length := 0
 var _curved_sentence_nodes: Array[Node2D] = []
 ## 对话框字格逐字浮现用的 tween
 var _cell_tween: Tween = null
+## 第三阶段：每接受一句话，画面就往「泪眼模糊」推一档。
+## 强度只增不减，模拟主角逐渐控制不住地流泪。
+func _build_up_phase3_tears() -> void:
+	if _story_stage() != 3 or not _dialog_hidden_p3:
+		return
+	if p3_tears == null:
+		return
+	_p3_tears_level = minf(P3_TEARS_MAX, _p3_tears_level + P3_TEARS_STEP)
+	# 越往后越糊：blur 倍率随强度递增
+	var blur_boost := lerpf(1.5, 3.8, _p3_tears_level)
+	var drop_boost := lerpf(0.9, 1.9, _p3_tears_level)
+	p3_tears.set_level(_p3_tears_level, blur_boost, drop_boost)
+
+
+## 清掉第三阶段的泪水（重开 / 离开第三阶段时）
+func _reset_phase3_tears() -> void:
+	_p3_tears_level = 0.0
+	if p3_tears != null:
+		p3_tears.set_level(0.0)
+
+
 ## 第三阶段把对话框移开的 tween
 var _dialog_swing_tween: Tween = null
 ## 对话框的原始 offset_top（用于复位）
@@ -1281,7 +1308,8 @@ var _dialog_hidden_p3 := false
 var _phase3_first_round := -1
 ## 结尾剧情开始后：环境音 / 心跳呼吸全部静音
 var _ending_muted := false
-## 面板原始背景样式（移到中央时换透明）
+## 第三阶段当前泪水强度 0~1
+var _p3_tears_level := 0.0## 面板原始背景样式（移到中央时换透明）
 var _dialog_home_style: StyleBox = null
 ## 父母合影闪现是否已触发过（一个阶段只触发一次）
 var _parents_flash_fired := false
@@ -1593,6 +1621,7 @@ func _update_mood_layer() -> void:
 				pass   # 移开动作在第一句打完后由 _notify_phase3_first_done 触发
 			else:
 				_promote_dialog_center(false)
+				_reset_phase3_tears()
 		if want_gallery3:
 			phase3_gallery.set_progress(_stage3_progress())
 

@@ -28,6 +28,8 @@ var _mat: ShaderMaterial
 var _strength := 0.0
 var _tween: Tween = null
 var _time := 0.0
+## 常驻模式（第三阶段流泪，不用一次性动画）
+var _persistent := false
 
 
 func _ready() -> void:
@@ -84,6 +86,7 @@ func play(intensity: float = 1.0) -> void:
 func hide_now() -> void:
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
+	_persistent = false
 	_strength = 0.0
 	if _mat != null:
 		_mat.set_shader_parameter("strength", 0.0)
@@ -109,3 +112,27 @@ func _process(delta: float) -> void:
 		return
 	_time += delta
 	_mat.set_shader_parameter("time_sec", _time)
+
+
+## ---- 常驻模式：第三阶段「逐渐流泪」用 ----
+## 和 play() 的一次性动画不同，set_level() 会一直保持这个强度，
+## 由外部按「接受了几句」不断累加。
+
+## 直接设置常驻强度（0 = 关闭）
+func set_level(level: float, blur_boost: float = 1.0, droplet_boost: float = 1.0) -> void:
+	if _rect == null or _mat == null:
+		return
+	var v := clampf(level, 0.0, 1.0)
+	_persistent = v > 0.001
+	if _tween != null and _tween.is_valid():
+		_tween.kill()
+	_strength = v
+	_mat.set_shader_parameter("strength", v)
+	_mat.set_shader_parameter("blur_boost", blur_boost)
+	_mat.set_shader_parameter("droplet_boost", droplet_boost)
+	_rect.visible = _persistent
+
+
+## 当前常驻强度（0~1）
+func get_level() -> float:
+	return _strength if _persistent else 0.0

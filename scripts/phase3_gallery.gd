@@ -236,14 +236,16 @@ func _apply_rect(r: TextureRect, rect: Rect2) -> void:
 
 
 func _index_for(p: float) -> int:
+	# 展开之后：**整段第三阶段都停在合影这一张**，
+	# 直到好感度升满才换成最后一张（要求：背景到满好感前不更换）。
+	if _expanded:
+		if p >= 0.999:
+			return SLIDES.size() - 1
+		return 1
 	var idx := 0
 	for i in SLIDE_AT.size():
 		if p >= float(SLIDE_AT[i]):
 			idx = i
-	# 展开之后，第 0 张（房间）只在入场交替时用，
-	# 全屏阶段从第 1 张（合影）开始，避免刚展开又切回房间。
-	if _expanded:
-		idx = maxi(idx, 1)
 	return idx
 
 
