@@ -206,6 +206,7 @@ func _ready() -> void:
 	story_overlay.finished.connect(_on_story_finished)
 	_create_main_menu()
 	_build_pause_menu()
+	_build_tutorial_overlay()
 	_show_menu()
 	if bgm_player != null:
 		bgm_player.play("res://audio/bgm/intro_circulation.mp3")
@@ -275,6 +276,11 @@ func _input(event: InputEvent) -> void:
 		# Alt 松开 = 结束抵抗
 		if key.keycode == KEY_ALT and not key.pressed and resisting:
 			_end_resist()
+		return
+	if phase == "tutorial":
+		if key.keycode in [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER, KEY_ESCAPE]:
+			_close_tutorial()
+			accept_event()
 		return
 	if phase == "story":
 		return
@@ -371,6 +377,132 @@ func _apply_font_to_static_labels() -> void:
 			(node as LineEdit).add_theme_font_override("font", font)
 		elif node is ProgressBar:
 			pass
+
+
+## 游戏内的操作说明浮层（第一次进入时弹一次）
+func _build_tutorial_overlay() -> void:
+	_tutorial_layer = Control.new()
+	_tutorial_layer.name = "TutorialLayer"
+	_tutorial_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_tutorial_layer.z_index = 55
+	_tutorial_layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	_tutorial_layer.visible = false
+	add_child(_tutorial_layer)
+	_tutorial_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	var scrim := ColorRect.new()
+	scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scrim.color = Color(0.02, 0.03, 0.04, 0.72)
+	scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tutorial_layer.add_child(scrim)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tutorial_layer.add_child(center)
+
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(720, 0)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.035, 0.04, 0.04, 0.97)
+	style.border_color = Color(1.0, 0.94, 0.0, 0.6)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(10)
+	style.content_margin_left = 36.0
+	style.content_margin_right = 36.0
+	style.content_margin_top = 26.0
+	style.content_margin_bottom = 24.0
+	panel.add_theme_stylebox_override("panel", style)
+	center.add_child(panel)
+
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 14)
+	panel.add_child(vb)
+
+	var font := _game_font_resource()
+
+	var head := Label.new()
+	head.text = "操作说明"
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if font != null:
+		head.add_theme_font_override("font", font)
+	head.add_theme_font_size_override("font_size", 30)
+	head.add_theme_color_override("font_color", Color(0.97, 0.95, 0.90))
+	vb.add_child(head)
+
+	var lines := [
+		"· 屏幕上会出现一句话，把它完整打出来就算「接住」",
+		"· 打错要整句重打，压力 +8",
+		"· 按住 Alt 可以抵抗跳过这句：麻木 +14、好感 −3，但不加压力",
+		"· 左条是剩余时间，右边两条是压力与麻木，任一满 100 就失败",
+		"· Esc 打开暂停菜单（继续 / 设置 / 回主界面）",
+		"· 打字方式（拼音 / 汉字）可在「设置」里切换，默认拼音",
+	]
+	for t in lines:
+		var l := Label.new()
+		l.text = t
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.custom_minimum_size = Vector2(620, 0)
+		if font != null:
+			l.add_theme_font_override("font", font)
+		l.add_theme_font_size_override("font_size", 20)
+		l.add_theme_color_override("font_color", Color(0.88, 0.87, 0.82))
+		vb.add_child(l)
+
+	var tip := Label.new()
+	tip.text = "按 空格 / 回车 或点下面按钮开始"
+	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if font != null:
+		tip.add_theme_font_override("font", font)
+	tip.add_theme_font_size_override("font_size", 16)
+	tip.add_theme_color_override("font_color", Color(0.70, 0.70, 0.66))
+	vb.add_child(tip)
+
+	var ok := Button.new()
+	ok.text = "明白了，开始"
+	ok.custom_minimum_size = Vector2(260, 50)
+	ok.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	ok.focus_mode = Control.FOCUS_NONE
+	if font != null:
+		ok.add_theme_font_override("font", font)
+	ok.add_theme_font_size_override("font_size", 24)
+	ok.add_theme_color_override("font_color", Color(1.0, 0.96, 0.84))
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(1, 1, 1, 0.08)
+	st.border_color = Color(1.0, 0.94, 0.0, 0.5)
+	st.set_border_width_all(1)
+	st.set_corner_radius_all(6)
+	ok.add_theme_stylebox_override("normal", st)
+	var hv := st.duplicate() as StyleBoxFlat
+	hv.bg_color = Color(1, 1, 1, 0.16)
+	ok.add_theme_stylebox_override("hover", hv)
+	ok.pressed.connect(_close_tutorial)
+	vb.add_child(ok)
+
+
+func _maybe_show_tutorial() -> void:
+	if _tutorial_layer == null:
+		return
+	if main_menu != null and main_menu.has_seen_tutorial():
+		return
+	phase = "tutorial"
+	_tutorial_layer.visible = true
+	input_box.editable = false
+	state_label.text = "先看一下操作说明"
+
+
+func _close_tutorial() -> void:
+	if _tutorial_layer == null or not _tutorial_layer.visible:
+		return
+	_tutorial_layer.visible = false
+	if main_menu != null:
+		main_menu.mark_tutorial_seen()
+	phase = "playing"
+	input_box.editable = input_mode == "hanzi" and input_lock_left <= 0.0 and not voice_waiting
+	state_label.text = "正在对话"
+	_apply_input_box_visibility()
+	if input_box.editable:
+		input_box.call_deferred("grab_focus")
 
 
 ## 构建暂停菜单的四颗按钮（继续 / 设置 / 回主界面 / 离开）
@@ -501,6 +633,8 @@ func _create_main_menu() -> void:
 func _on_menu_start(mode: String) -> void:
 	_pause_settings_open = false
 	pause_overlay.hide()
+	if _tutorial_layer != null:
+		_tutorial_layer.visible = false
 	if main_menu != null:
 		main_menu.close()
 	_set_game_hud_visible(true)
@@ -723,6 +857,9 @@ func _advance_sentence(message: String) -> void:
 			get_tree().create_timer(delay).timeout.connect(_spawn_current_sentence_arc)
 		else:
 			_spawn_curved_sentence(current_sentence, current_kind)
+	# 第一句真正开始打字前，弹一次操作说明（只弹一次）
+	if round_number == 1:
+		_maybe_show_tutorial()
 
 
 ## 每个阶段 10 句的句子类型牌堆。
@@ -1711,6 +1848,8 @@ var _last_input_length := 0
 var main_menu: Control = null
 ## 暂停菜单里是否开着设置浮层
 var _pause_settings_open := false
+## 游戏内的操作说明浮层
+var _tutorial_layer: Control = null
 ## 当前飘在画面上的句子节点（长句会拆成多行，所以是数组）
 var _curved_sentence_nodes: Array[Node2D] = []
 ## 对话框字格逐字浮现用的 tween

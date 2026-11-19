@@ -26,8 +26,7 @@ var _title: Label
 var _title_mat: ShaderMaterial
 var _buttons: VBoxContainer
 var _settings_panel: Panel
-var _tutorial_panel: PanelContainer
-var _tutorial_center: CenterContainer
+
 var _volume_slider: HSlider
 var _volume_value: Label
 var _fullscreen_btn: Button
@@ -119,7 +118,6 @@ func _build() -> void:
 	_add_menu_button("离开", _on_quit)
 
 	_build_settings_panel()
-	_build_tutorial_panel()
 
 
 func _add_menu_button(text: String, cb: Callable) -> Button:
@@ -235,71 +233,12 @@ func _build_settings_panel() -> void:
 	vb.add_child(back)
 
 
-## 第一次进入时的操作说明
-## 用 CenterContainer + PanelContainer，让面板按内容自动撑高，
-## 避免固定尺寸时按钮溢出到框外。
-func _build_tutorial_panel() -> void:
-	_tutorial_center = CenterContainer.new()
-	_tutorial_center.name = "TutorialCenter"
-	_tutorial_center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_tutorial_center.mouse_filter = Control.MOUSE_FILTER_STOP
-	_tutorial_center.visible = false
-	add_child(_tutorial_center)
-
-	_tutorial_panel = PanelContainer.new()
-	_tutorial_panel.custom_minimum_size = Vector2(700, 0)
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.035, 0.04, 0.04, 0.97)
-	style.border_color = Color(1.0, 0.94, 0.0, 0.55)
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(10)
-	style.content_margin_left = 34.0
-	style.content_margin_right = 34.0
-	style.content_margin_top = 26.0
-	style.content_margin_bottom = 24.0
-	_tutorial_panel.add_theme_stylebox_override("panel", style)
-	_tutorial_center.add_child(_tutorial_panel)
-
-	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 14)
-	_tutorial_panel.add_child(vb)
-
-	var head := _make_label("操作说明", 32, Color(0.97, 0.95, 0.90))
-	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vb.add_child(head)
-
-	var lines := [
-		"· 屏幕上会出现一句话，把它完整打出来就算「接住」",
-		"· 打错要整句重打，压力 +8",
-		"· 按住 Alt 可以抵抗跳过这句：麻木 +14、好感 −3，但不加压力",
-		"· 左条是剩余时间，右边两条是压力与麻木，任一满 100 就失败",
-		"· Esc 打开暂停菜单（继续 / 设置 / 回主界面）",
-		"· 打字方式（拼音 / 汉字）可在「设置」里切换，默认拼音",
-	]
-	for t in lines:
-		var l := _make_label(t, 20, Color(0.88, 0.87, 0.82))
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		l.custom_minimum_size = Vector2(600, 0)
-		vb.add_child(l)
-
-	var tip := _make_label("（之后可以在暂停菜单里再看设置）", 16, Color(0.68, 0.68, 0.64))
-	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vb.add_child(tip)
-
-	var ok := _make_value_button("明白了，开始")
-	ok.custom_minimum_size = Vector2(260, 50)
-	ok.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	ok.pressed.connect(_dismiss_tutorial)
-	vb.add_child(ok)
-
-
 ## 从暂停菜单打开「只显示设置」的浮层（不显示标题和主按钮）
 func open_settings_overlay() -> void:
 	visible = true
 	_in_settings = true
 	_buttons.visible = false
 	_title.visible = false
-	_tutorial_center.visible = false
 	_settings_panel.visible = true
 	_refresh_setting_labels()
 
@@ -347,24 +286,19 @@ func _make_value_button(text: String) -> Button:
 func _on_start() -> void:
 	if _in_settings:
 		return
-	# 第一次进入先看操作说明
-	if not bool(settings["tutorial_seen"]):
-		_show_tutorial()
-		return
+	# 操作说明改在游戏内弹出，主界面这里直接进游戏
 	start_pressed.emit(String(settings["mode"]))
 
 
-func _show_tutorial() -> void:
-	_buttons.visible = false
-	_tutorial_center.visible = true
+## 是否已经看过游戏内的操作说明
+func has_seen_tutorial() -> bool:
+	return bool(settings["tutorial_seen"])
 
 
-func _dismiss_tutorial() -> void:
+## 标记已看过操作说明（游戏内关闭时调用）
+func mark_tutorial_seen() -> void:
 	settings["tutorial_seen"] = true
 	_save_settings()
-	_tutorial_center.visible = false
-	_buttons.visible = true
-	start_pressed.emit(String(settings["mode"]))
 
 
 func _on_open_settings() -> void:
@@ -467,7 +401,6 @@ func open() -> void:
 	visible = true
 	_in_settings = false
 	_settings_panel.visible = false
-	_tutorial_center.visible = false
 	_title.visible = true
 	_buttons.visible = true
 	_refresh_setting_labels()
