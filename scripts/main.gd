@@ -354,6 +354,7 @@ func _start_game(mode: String) -> void:
 		phase3_gallery.reset()
 	_dialog_home_rect = Rect2()
 	_dialog_hidden_p3 = false
+	_phase3_first_round = -1
 	if tears_fx != null:
 		tears_fx.hide_now()
 	# 恢复对话框位置（上一局第三阶段可能把它移开了）
@@ -396,6 +397,9 @@ func _advance_sentence(message: String) -> void:
 		_end_game(false)
 		return
 	round_number += 1
+	# 登记第三阶段第一句的句号，供布局切换判定
+	if _story_stage() == 3 and _phase3_first_round < 0:
+		_phase3_first_round = round_number
 	current_kind = kind_deck[round_number - 1]
 	# 闪现触发后，接下来几句改成从"偷听到的"好句子池抽
 	var entry: Dictionary
@@ -1018,6 +1022,10 @@ func _curved_tone(tone: String) -> Dictionary:
 func _spawn_curved_sentence(body: String, tone: String) -> void:
 	if text_fx_root == null or body.is_empty():
 		return
+	# 第三阶段展开后：字显示在中央面板里（平直 + 拼音 + 输入反馈），
+	# 不再额外画一层飘字，避免和照片/面板重叠。
+	if _sentence_phase() == "phase3" and _dialog_hidden_p3:
+		return
 	_clear_curved_text()
 	var settings := _curved_tone(tone)
 	var plan := _plan_curved_lines(body)
@@ -1246,6 +1254,8 @@ var _dialog_swing_tween: Tween = null
 var _dialog_home_rect := Rect2()
 ## 第三阶段是否已把对话框移开
 var _dialog_hidden_p3 := false
+## 第三阶段第一句的 round_number
+var _phase3_first_round := -1
 ## 父母合影闪现是否已触发过（一个阶段只触发一次）
 var _parents_flash_fired := false
 ## 本阶段还要从 overheard 池抽几句（>0 表示正在用偷听句子）
@@ -1514,7 +1524,10 @@ func _update_mood_layer() -> void:
 	var in_game := phase in ["playing", "story", "won", "lost"]
 	var stage := _story_stage()          # 1 / 2 / 3
 	var want_mood1 := in_game and stage <= 1
-	var want_room2 := in_game and stage == 2
+	# 第三阶段第一句仍保留二阶段房间画面，
+	# 等打完第一句（画廊展开）才切走，这样第一句和之前完全一样。
+	var gallery_expanded: bool = phase3_gallery != null and phase3_gallery.is_expanded()
+	var want_room2 := in_game and (stage == 2 or (stage >= 3 and not gallery_expanded))
 	var want_gallery3 := in_game and stage >= 3
 
 	if mood_layer != null:
@@ -1748,6 +1761,10 @@ func _notify_phase3_first_done() -> void:
 		return
 	if phase3_gallery == null or phase3_gallery.is_expanded():
 		return   # 已经切换过了，不重复触发
+	# 必须正好是第三阶段第 1 句打完才切换。
+	# 否则第二阶段最后一句把好感推过阈值时 stage 已是 3，会提前触发。
+	if _phase3_first_round < 0 or round_number != _phase3_first_round:
+		return
 	# 1) 照片拉开成全屏
 	phase3_gallery.expand_to_full()
 	# 2) 把对话框（输入区）移到屏幕中央并放大

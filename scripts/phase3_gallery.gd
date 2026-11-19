@@ -240,6 +240,10 @@ func _index_for(p: float) -> int:
 	for i in SLIDE_AT.size():
 		if p >= float(SLIDE_AT[i]):
 			idx = i
+	# 展开之后，第 0 张（房间）只在入场交替时用，
+	# 全屏阶段从第 1 张（合影）开始，避免刚展开又切回房间。
+	if _expanded:
+		idx = maxi(idx, 1)
 	return idx
 
 
