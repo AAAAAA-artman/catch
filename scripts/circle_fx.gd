@@ -12,14 +12,17 @@ extends Control
 ## 外圆半径 = 屏幕短边 × 这个比例
 const R_OUT_RATIO := 0.455
 ## 内圆最小 / 最大半径 = 外圆 × 比例
-const R_IN_MIN := 0.26
-const R_IN_MAX := 0.84
+## 范围拉大（0.14~0.92，相差 6.6 倍），让每句的大小变化一眼可见
+const R_IN_MIN := 0.14
+const R_IN_MAX := 0.92
 
 const FADE_IN := 0.22
 const HOLD := 1.15
 const FADE_OUT := 0.38
 ## 内圆从旧值过渡到新值的时间
-const INNER_EASE := 0.65
+const INNER_EASE := 1.1
+## 先显示旧尺寸多久，再开始变化（让玩家看清"变化前 → 变化后"）
+const HOLD_BEFORE_CHANGE := 0.45
 
 const RING_COLOR := Color(1.0, 1.0, 1.0, 1.0)
 const OUTER_WIDTH := 2.6
@@ -32,6 +35,8 @@ var _text := ""
 var _target_inner := R_IN_MIN
 ## 当前绘制的内圆比例（带缓动）
 var _inner := R_IN_MIN
+## 上一句的内圆比例（这一句开场先用它，再变到新值）
+var _prev_inner := R_IN_MIN
 var _alpha := 0.0
 var _font: Font = null
 
@@ -63,6 +68,10 @@ func play(sentence: String, progress: float) -> void:
 	_text = sentence
 	_target_inner = inner_ratio_for(progress)
 
+	# 跨阶段：进度突然变小，说明进了新阶段，内圆该从头长
+	if _target_inner < _prev_inner - 0.15:
+		_prev_inner = R_IN_MIN
+
 	if _fade_tween != null and _fade_tween.is_valid():
 		_fade_tween.kill()
 	if _inner_tween != null and _inner_tween.is_valid():
@@ -70,17 +79,30 @@ func play(sentence: String, progress: float) -> void:
 
 	visible = true
 
-	# 内圆缓动到新半径
-	_inner_tween = create_tween()
-	_inner_tween.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
-	_inner_tween.tween_method(_set_inner, _inner, _target_inner, INNER_EASE)
+	# ---- 内圆动画：先用"上一句的尺寸"出现，停一下，再变到新尺寸 ----
+	# 这样玩家能明确看出"从多大长到多大"，而不是一出现就是最终大小。
+	_inner = _prev_inner
+	_set_inner(_prev_inner)
 
-	# 淡入 → 停留 → 淡出
+	_inner_tween = create_tween()
+	# 1) 先停在旧尺寸
+	_inner_tween.tween_interval(HOLD_BEFORE_CHANGE)
+	# 2) 再过渡到新尺寸（带一点回弹感）
+	_inner_tween.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	_inner_tween.tween_method(_set_inner, _prev_inner, _target_inner, INNER_EASE)
+	_inner_tween.tween_callback(_commit_inner)
+
+	# ---- 淡入 → 停留 → 淡出 ----
 	_fade_tween = create_tween()
 	_fade_tween.tween_method(_set_alpha, _alpha, 1.0, FADE_IN)
 	_fade_tween.tween_interval(HOLD)
 	_fade_tween.tween_method(_set_alpha, 1.0, 0.0, FADE_OUT)
 	_fade_tween.tween_callback(_on_finished)
+
+
+## 动画结束后把"当前尺寸"记成"上一句尺寸"，供下一句开场使用
+func _commit_inner() -> void:
+	_prev_inner = _target_inner
 
 
 ## 立刻收掉（进剧情 / 结算 / 暂停时用）

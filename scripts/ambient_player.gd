@@ -22,8 +22,9 @@ const DRIPPING_PATH := "res://audio/ambient/dripping.mp3"
 const RACING_PATH := "res://audio/ambient/racing.mp3"
 
 ## ---- 切菜声 ----
-const CHOP_MIN_DB := -34.0
-const CHOP_MAX_DB := -12.0
+## 一开始就"清楚能听见"（不是若有若无），压力上升后变得更快更重。
+const CHOP_MIN_DB := -13.0
+const CHOP_MAX_DB := -4.0
 
 ## ---- 耳鸣 ----
 const TIN_MIN_DB := -48.0
@@ -31,15 +32,17 @@ const TIN_MAX_DB := -9.0
 
 ## ---- 偶发：水滴 ----
 ## 响起时的音量（很轻，只是"屋里有水声"）
-const DRIP_DB := -30.0
+const DRIP_DB := -24.0
 ## 随机间隔（秒）
 const DRIP_GAP_MIN := 8.0
 const DRIP_GAP_MAX := 22.0
 
 ## ---- 偶发：飙车声 ----
-const RACE_DB := -28.0
-const RACE_GAP_MIN := 12.0
-const RACE_GAP_MAX := 30.0
+## 偶尔"呼"地冲过去一次，声音很大（近似正常音乐音量），
+## 间隔约一分钟 —— 是突然的惊吓，不是背景底噪。
+const RACE_DB := -3.0
+const RACE_GAP_MIN := 55.0
+const RACE_GAP_MAX := 75.0
 
 ## 持续层音量平滑速度
 const FADE_SPEED := 1.6

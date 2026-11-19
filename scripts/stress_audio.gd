@@ -22,15 +22,15 @@ extends Node
 const HEARTBEATS := [
 	{
 		"path": "res://audio/heartbeat/hb_normal.mp3",
-		"from": 0.0, "to": 45.0, "db": -13.0,
+		"from": 0.0, "to": 45.0, "db": -1.0,
 	},
 	{
 		"path": "res://audio/heartbeat/hb_fast.mp3",
-		"from": 40.0, "to": 80.0, "db": -9.5,
+		"from": 40.0, "to": 80.0, "db": 2.0,
 	},
 	{
 		"path": "res://audio/heartbeat/hb_rapid.mp3",
-		"from": 72.0, "to": 100.0, "db": -5.0,
+		"from": 72.0, "to": 100.0, "db": 5.0,
 	},
 ]
 
@@ -38,15 +38,15 @@ const HEARTBEATS := [
 const BREATHS := [
 	{
 		"path": "res://audio/heartbeat/br_soft.mp3",
-		"from": 8.0, "db": -25.0,
+		"from": 8.0, "db": -11.0,
 	},
 	{
 		"path": "res://audio/heartbeat/br_cold.mp3",
-		"from": 30.0, "db": -18.0,
+		"from": 30.0, "db": -6.0,
 	},
 	{
 		"path": "res://audio/heartbeat/br_heavy.mp3",
-		"from": 58.0, "db": -10.0,
+		"from": 58.0, "db": 0.0,
 	},
 ]
 
@@ -102,41 +102,50 @@ func _make_player(node_name: String, path: String) -> AudioStreamPlayer:
 ##   in_game   是否在对局中
 func update_state(pressure: float, in_game: bool) -> void:
 	_active = in_game
-
 	var p := clampf(pressure, 0.0, 100.0)
 
-	# ---- 心跳：每档只在自己区间内成长，离开就衰减 ----
-	# 关键：高档位（极快）的区间要覆盖到 100，否则压力满时会全部哑掉。
+	# ---- 心跳：三档互斥，按压力选一档 ----
+	var hb_idx := _pick_tier(HEARTBEATS, p)
 	for i in HEARTBEATS.size():
 		var cfg: Dictionary = HEARTBEATS[i]
-		var from := float(cfg["from"])
-		var to := float(cfg["to"])
 		var db_max := float(cfg["db"])
-		if p < from:
+		if i == hb_idx:
+			# 选中档：按该档区间内的进度爬到满档音量
+			var from := float(cfg.get("from", 0.0))
+			var to := float(cfg.get("to", 100.0))
+			var w := clampf((p - from) / maxf(to - from, 1.0), 0.35, 1.0)
+			_hb_target[i] = lerpf(SILENT_DB, db_max, w)
+		else:
 			_hb_target[i] = SILENT_DB
-			continue
-		# 进入区间后线性爬到 1
-		var weight := clampf((p - from) / maxf(to - from, 0.001), 0.0, 1.0)
-		weight = pow(weight, 0.55)
-		# 超过 to 之后让位给更高档：每超出 1 点压力降一点音量
-		if p > to:
-			var overshoot := clampf((p - to) / 30.0, 0.0, 1.0)
-			weight *= (1.0 - overshoot * 0.85)
-		_hb_target[i] = lerpf(SILENT_DB, db_max, weight)
 
-	# ---- 呼吸：单调递增，压力越高越明显 ----
+	# ---- 呼吸：三档互斥，按压力选一档 ----
+	var br_idx := _pick_tier(BREATHS, p)
 	for i in BREATHS.size():
 		var cfg: Dictionary = BREATHS[i]
-		var from := float(cfg["from"])
 		var db_max := float(cfg["db"])
-		var weight := clampf((p - from) / maxf(100.0 - from, 0.001), 0.0, 1.0)
-		# 开个头陡一点，后面平缓
-		weight = pow(weight, 0.6)
-		_br_target[i] = lerpf(SILENT_DB, db_max, weight) if weight > 0.01 else SILENT_DB
+		if i == br_idx:
+			var from := float(cfg.get("from", 0.0))
+			var w := clampf((p - from) / maxf(100.0 - from, 1.0), 0.3, 1.0)
+			_br_target[i] = lerpf(SILENT_DB, db_max, w)
+		else:
+			_br_target[i] = SILENT_DB
 
-	# 起播 / 停播
 	_apply_playback(_hb_players, _hb_target)
 	_apply_playback(_br_players, _br_target)
+
+
+## 按压力值挑一个档位（返回下标）。
+## 规则：取"from 最大且 <= 压力"的那一档；都不满足就返回 -1（全静音）。
+func _pick_tier(tiers: Array, p: float) -> int:
+	var best := -1
+	var best_from := -1.0
+	for i in tiers.size():
+		var cfg: Dictionary = tiers[i]
+		var from := float(cfg.get("from", 0.0))
+		if p >= from and from >= best_from:
+			best_from = from
+			best = i
+	return best
 
 
 func _apply_playback(players: Array[AudioStreamPlayer], targets: Array[float]) -> void:

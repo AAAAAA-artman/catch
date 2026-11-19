@@ -35,6 +35,11 @@ var phrase_mistakes := 0
 var error_flash := false
 var error_flash_id := 0
 var input_lock_left := 0.0
+## voice playing -> input locked
+var voice_waiting := false
+## voice wait timeout guard
+const VOICE_WAIT_LIMIT := 8.0
+var _voice_wait_elapsed := 0.0
 var has_started_typing := false
 var phrase_elapsed := 0.0
 var time_left := 0.0
@@ -155,9 +160,22 @@ func _process(delta: float) -> void:
 	_update_mood_layer()
 	if phase != "playing":
 		return
+	# ---- 语音等待：播完才放开输入 ----
+	if voice_waiting:
+		_voice_wait_elapsed += delta
+		var still_playing: bool = voice_player != null and voice_player.is_playing()
+		if not still_playing or _voice_wait_elapsed >= VOICE_WAIT_LIMIT:
+			voice_waiting = false
+			_voice_wait_elapsed = 0.0
+			if input_lock_left <= 0.0:
+				if input_mode == "hanzi":
+					input_box.editable = true
+					input_box.call_deferred("grab_focus")
+				state_label.text = "可以开始输入"
+
 	if input_lock_left > 0.0:
 		input_lock_left = maxf(0.0, input_lock_left - delta)
-		if input_lock_left == 0.0:
+		if input_lock_left == 0.0 and not voice_waiting:
 			if input_mode == "hanzi":
 				input_box.editable = true
 				input_box.call_deferred("grab_focus")
@@ -208,7 +226,7 @@ func _input(event: InputEvent) -> void:
 		elif phase == "paused":
 			phase = "playing"
 			pause_overlay.hide()
-			input_box.editable = input_mode == "hanzi" and input_lock_left <= 0.0
+			input_box.editable = input_mode == "hanzi" and input_lock_left <= 0.0 and not voice_waiting
 			state_label.text = "正在对话"
 			if input_box.editable:
 				input_box.call_deferred("grab_focus")
@@ -231,7 +249,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _handle_pinyin_key(key: InputEventKey) -> void:
-	if input_lock_left > 0.0:
+	if input_lock_left > 0.0 or voice_waiting:
 		accept_event()
 		return
 	if key.ctrl_pressed or key.alt_pressed or key.meta_pressed:
@@ -344,6 +362,8 @@ func _start_game(mode: String) -> void:
 	mistakes = 0
 	phrase_mistakes = 0
 	input_lock_left = 0.0
+	voice_waiting = false
+	_voice_wait_elapsed = 0.0
 	has_started_typing = false
 	last_sentence = ""
 	_build_kind_deck()
@@ -386,6 +406,8 @@ func _advance_sentence(message: String) -> void:
 	phrase_elapsed = 0.0
 	phrase_mistakes = 0
 	input_lock_left = 0.0
+	voice_waiting = false
+	_voice_wait_elapsed = 0.0
 	has_started_typing = false
 	error_flash = false
 	error_flash_id += 1
@@ -672,6 +694,11 @@ func _flash_error() -> void:
 
 
 func _on_text_changed(value: String) -> void:
+	if voice_waiting:
+		# 语音播放期间不接受输入，把内容退回
+		if input_box != null:
+			input_box.text = ""
+		return
 	if phase != "playing":
 		return
 	if input_lock_left > 0.0:
@@ -1144,7 +1171,16 @@ func _sentence_speaker() -> String:
 func _play_sentence_voice() -> void:
 	if voice_player == null or current_sentence.is_empty():
 		return
-	voice_player.play_for_sentence(current_sentence, _sentence_speaker())
+	var started: bool = voice_player.play_for_sentence(current_sentence, _sentence_speaker())
+	# 语音开始播放 -> 锁住输入，等它播完再放开
+	if started:
+		voice_waiting = true
+		_voice_wait_elapsed = 0.0
+		if input_box != null:
+			input_box.editable = false
+		state_label.text = "正在听…"
+	else:
+		voice_waiting = false
 
 
 # ============================================================ 音效
@@ -1594,3 +1630,15 @@ func _update_stress_audio() -> void:
 		return
 	var in_game := phase in ["playing", "story", "won", "lost"]
 	stress_audio.update_state(pressure, in_game)
+
+
+## 跳过语音等待（测试 / 开发者快捷键用）。
+## 正常游玩时语音播完会自动解锁；这里提供手动解锁，便于自动化测试和快速调试。
+func skip_voice_wait() -> void:
+	voice_waiting = false
+	_voice_wait_elapsed = 0.0
+	if input_lock_left <= 0.0 and input_box != null:
+		if input_mode == "hanzi":
+			input_box.editable = true
+			input_box.call_deferred("grab_focus")
+		state_label.text = "可以开始输入"

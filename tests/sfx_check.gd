@@ -22,6 +22,7 @@ func _initialize() -> void:
 	game._start_game("hanzi")
 	await _frames(4)
 	ov.finish_now()
+	game.skip_voice_wait()
 	await _frames(8)
 	print("SFX 开局完成, 当前句 = ", game.current_sentence, " 类型 = ", game.current_kind)
 
@@ -51,6 +52,7 @@ func _initialize() -> void:
 	# 4) 负面句子：压力低 → negative_1
 	if game.phase == "story":
 		ov.finish_now()
+		game.skip_voice_wait()
 		await _frames(6)
 	game.current_kind = "negative"
 	game.pressure = 20.0
@@ -78,15 +80,16 @@ func _initialize() -> void:
 	print("SFX 7) 普通句 → ", _last_oneshot())
 
 	# 8) 阶段满进剧情 → stage_complete
+	# 直接调用"进入剧情"的内部流程，绕开打字结算（前面的测试已经打乱了好几轮状态，
+	# 靠结算推好感不可靠）。这一步只验证 stage_complete 是否被触发。
 	sfx.stop_all()
-	game.affection = 95.0
-	game.phrase_elapsed = 20.0
+	game.affection = game.STORY_MID_1 + 1.0
 	game._update_bars()
-	game.current_kind = "neutral"
-	game.input_box.text = game.current_target
-	game.input_box.text_changed.emit(game.current_target)
-	await _frames(3)
+	game.phase = "playing"
+	var entered: bool = game._start_story_chain("测试")
+	await process_frame
 	var found := _find_playing("stage_complete")
+	print("SFX 8) _start_story_chain 返回=", entered, " phase=", game.phase)
 	print("SFX 8) 阶段满进剧情(phase=", game.phase, ") → stage_complete 播放中 = ", found)
 
 	print("SFX DONE")

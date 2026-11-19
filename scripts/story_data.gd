@@ -10,17 +10,17 @@ extends RefCounted
 ##   · 每行末尾的逗号不能省
 ##
 ## 五个剧情段与 BGM：
-##   prologue    回家路上 → 进门 → 睡着        Circulation
-##   act1_intro  梦中醒来（变小、被声音淹没）    Dream Street
-##   act1_end    第一段游戏后的剧情             There's Something Outside
+##   prologue    回家路上 → 进门 → 睡着         Circulation
+##   act1_intro  梦中被父母声音包围              Dream Street
+##   act1_end    第一段游戏后的剧情（含过渡二）   There's Something Outside
 ##   act2_end    第二段游戏后的剧情             萍逢
-##   epilogue    第三段 → 结局                  萍逢
+##   epilogue    第三段 → 结局（含信件全文）     萍逢
 ##
 ## 游戏流程：
 ##   prologue → 第一段游戏 → act1_intro → act1_end → 第二段游戏
 ##   → act2_end → 第三段游戏 → epilogue → 结算
 ##
-## 台词全部来自《游戏总文案(1)(2).docx》，未做删改。
+## 台词全部来自《游戏总文案(1)(2) (2).docx》，未做删改。
 ## 想调顺序/删减/加台词，直接改下面每个 "lines" 数组即可。
 
 const SEGMENTS := {
@@ -73,6 +73,27 @@ const SEGMENTS := {
 		"background": "res://art/story/door_black.png",
 		"bgm": "res://audio/bgm/dream_street.mp3",
 		"lines": [
+			{"speaker": "", "text": "父母的声音突然出现在我的耳边"},
+			{"speaker": "", "text": "谁在说话…你们怎么在这里"},
+			{"speaker": "", "text": "我求求你们不要再说了，我真的不知道怎么做"},
+		],
+	},
+	"act1_end": {
+		"background": "res://art/story/door_dark.png",
+		"bgm": "res://audio/bgm/something_outside.mp3",
+		"lines": [
+			{"speaker": "父母", "text": "这孩子怎么还没起"},
+			{"speaker": "父母", "text": "你去看看她是不是又把门锁住了"},
+			{"speaker": "父母", "text": "饭都快放凉了"},
+			{"speaker": "父母", "text": "昨天晚上肯定又不知道几点睡的"},
+			{"speaker": "", "text": "脚步声逐渐贴近，父母的说话声越来越清晰"},
+			{"speaker": "", "text": "对着客厅的窗户有个奇怪的黑影走过"},
+			{"speaker": "", "text": "房间越来越黑了"},
+			{"speaker": "父母", "text": "都说多少遍了不要关门，她老是不听"},
+			{"speaker": "父母", "text": "就是啊。"},
+			{"speaker": "", "text": "锈迹斑斑的铁门吱呀一声被推到墙上，发出一声巨响"},
+			{"speaker": "", "text": "漆黑的门后出现的是一个我闻所未闻的怪物"},
+			{"speaker": "", "text": "……"},
 			{"speaker": "", "text": "啊！"},
 			{"speaker": "", "text": "（我害怕得紧紧缩到被子里）"},
 			{"speaker": "", "text": "奇怪，被子什么时候变这么大了"},
@@ -84,30 +105,8 @@ const SEGMENTS := {
 			{"speaker": "", "text": "（我拼命捂住耳朵但无济于事）"},
 		],
 	},
-	"act1_end": {
-		"background": "res://art/story/door_dark.png",
-		"bgm": "res://audio/bgm/something_outside.mp3",
-		"lines": [
-			{"speaker": "", "text": "谁在说话…你们怎么在这里"},
-			{"speaker": "", "text": "我求求你们不要再说了，我真的不知道怎么做"},
-			{"speaker": "", "text": "可是我也不想让你们担心"},
-			{"speaker": "", "text": "我不想看见你们"},
-			{"speaker": "爸爸妈妈", "text": "“这孩子怎么还没起”"},
-			{"speaker": "爸爸妈妈", "text": "“你去看看她是不是又把门锁住了”"},
-			{"speaker": "爸爸妈妈", "text": "“饭都快放凉了”"},
-			{"speaker": "爸爸妈妈", "text": "“昨天晚上肯定又不知道几点睡的”"},
-			{"speaker": "", "text": "脚步声逐渐贴近，父母的说话声越来越清晰"},
-			{"speaker": "", "text": "对着客厅的窗户有个奇怪的黑影走过"},
-			{"speaker": "", "text": "房间越来越黑了"},
-			{"speaker": "爸爸妈妈", "text": "“都说多少遍了不要关门，她老是不听”"},
-			{"speaker": "爸爸妈妈", "text": "“就是啊。”"},
-			{"speaker": "", "text": "锈迹斑斑的铁门吱呀一声被推到墙上，发出一声巨响"},
-			{"speaker": "", "text": "漆黑的门后出现的是一个我闻所未闻的怪物"},
-			{"speaker": "", "text": "……"},
-		],
-	},
 	"act2_end": {
-		"background": "res://art/story/door_dark.png",
+		"background": "res://art/story/room_figure.png",
 		"bgm": "res://audio/bgm/pengfeng.mp3",
 		"lines": [
 			{"speaker": "", "text": "我不明白…"},
@@ -125,11 +124,11 @@ const SEGMENTS := {
 		],
 	},
 	"epilogue": {
-		"background": "res://art/story/room_figure.png",
+		"background": "res://art/story/room_clean.png",
 		"bgm": "res://audio/bgm/pengfeng.mp3",
 		"lines": [
 			{"speaker": "", "text": "（窗帘并没有拉上，我被一条刺眼的阳光耀醒）"},
-			{"speaker": "", "text": "：妈妈…帮我拉一下窗帘"},
+			{"speaker": "", "text": "妈妈…帮我拉一下窗帘"},
 			{"speaker": "", "text": "（在阳光下睁不开眼，挣扎了一会后，突然想到了什么）"},
 			{"speaker": "", "text": "不对…"},
 			{"speaker": "", "text": "刚刚的是梦吗？"},
@@ -159,30 +158,28 @@ const SEGMENTS := {
 			{"speaker": "", "text": "这是…"},
 			{"speaker": "", "text": "（是一封信，署名日期是三年前）"},
 			{"speaker": "", "text": "（我双手颤抖着打开）"},
-			{"speaker": "爸爸妈妈", "text": "“对不起，我的孩子，爸爸妈妈知道小时候亏欠你太多了”"},
-			{"speaker": "爸爸妈妈", "text": "“你现在和我们不亲了，我们也理解”"},
-			{"speaker": "爸爸妈妈", "text": "“我们一直对你要求很严格，也说过很多不好听的话，你小时候也很讨厌这样吧”"},
-			{"speaker": "爸爸妈妈", "text": "“我们也是第一次当父母，我们忘了当初只是想让你开心平安地长大”"},
-			{"speaker": "爸爸妈妈", "text": "“我们发现世界不是这样的，我们不能帮你规避掉所有的困难”"},
-			{"speaker": "爸爸妈妈", "text": "“我们希望你以后变成一个顶天立地的人”"},
-			{"speaker": "爸爸妈妈", "text": "“因为爸爸妈妈不能一直照顾你，所以我们想让你学会好好照顾自己”"},
-			{"speaker": "爸爸妈妈", "text": "“但是我们后来才发现，我们给了你太大的压力”"},
-			{"speaker": "爸爸妈妈", "text": "“我们想弥补你的时候，发现已经来不及了，你已经长大了，我们也做错很多年了。”"},
-			{"speaker": "爸爸妈妈", "text": "“爸爸妈妈知道你不想见我们，我们也不勉强你回来，你过好自己的生活就可以”"},
-			{"speaker": "爸爸妈妈", "text": "“你不用原谅我们，你可以讨厌我们…恨我们”"},
-			{"speaker": "爸爸妈妈", "text": "“但是我们为你骄傲，一直都是…我们从来没有觉得你比别人差…”"},
+			{"speaker": "父母", "text": "对不起，我的孩子，爸爸妈妈知道小时候亏欠你太多了"},
+			{"speaker": "父母", "text": "你现在和我们不亲了，我们也理解"},
+			{"speaker": "父母", "text": "我们一直对你要求很严格，也说过很多不好听的话，你小时候也很讨厌这样吧"},
+			{"speaker": "父母", "text": "我们也是第一次当父母，我们忘了当初只是想让你开心平安地长大"},
+			{"speaker": "父母", "text": "我们发现世界不是这样的，我们不能帮你规避掉所有的困难"},
+			{"speaker": "父母", "text": "我们希望你以后变成一个顶天立地的人"},
+			{"speaker": "父母", "text": "因为爸爸妈妈不能一直照顾你，所以我们想让你学会好好照顾自己"},
+			{"speaker": "父母", "text": "但是我们后来才发现，我们给了你太大的压力"},
+			{"speaker": "父母", "text": "我们想弥补你的时候，发现已经来不及了，你已经长大了，我们也做错很多年了。"},
+			{"speaker": "父母", "text": "爸爸妈妈知道你不想见我们，我们也不勉强你回来，你过好自己的生活就可以"},
+			{"speaker": "父母", "text": "你不用原谅我们，你可以讨厌我们…恨我们"},
+			{"speaker": "父母", "text": "但是我们为你骄傲，一直都是…我们从来没有觉得你比别人差…"},
 			{"speaker": "", "text": "（泪水在眼眶里渐渐模糊视线，我用手去擦，反而越擦越多，很多字都看不清了）"},
-			{"speaker": "爸爸妈妈", "text": "“冰箱里……饺子……冻……”"},
-			{"speaker": "爸爸妈妈", "text": "“等你……回来……”"},
+			{"speaker": "父母", "text": "冰箱里……饺子……冻……"},
+			{"speaker": "父母", "text": "等你……回来……"},
 			{"speaker": "", "text": "（最后一句特别显眼）"},
-			{"speaker": "爸爸妈妈", "text": "“爸爸妈妈……爱你……对不起……”"},
+			{"speaker": "父母", "text": "爸爸妈妈……爱你……对不起……"},
 			{"speaker": "", "text": "我不恨你们了"},
 			{"speaker": "", "text": "我原谅你们，你们也原谅我好吗？"},
-			{"speaker": "爸爸妈妈", "text": "“我们从来没有怪过你”"},
+			{"speaker": "父母", "text": "我们从来没有怪过你"},
 			{"speaker": "", "text": "一个声音在我脑中响起了"},
 			{"speaker": "", "text": "是你们告诉我的吗，我真的听见了"},
-			{"speaker": "", "text": "（以下是我看到过关于把恨和爱比作浪和海，突然想写下来的东西，觉得有点像这个文本想说的东西，不知道有没有用…）"},
-			{"speaker": "", "text": "我们的爱是一片海，恨是海的浪花，我们的内心总是汹涌，激起的浪盖住了海，我们分不清爱和恨到底区别在哪里。当我内心的海渐渐平静的时候，恨的浪花渐渐消退了，我们才能看清楚，原来恨的底色是爱。一切浪花都会在海中诞生、消逝，恨也在爱的起伏中时隐时现。我们像一条鱼，穷极一生在海中挣扎，我们躲避猛烈的浪，想要寻找爱，最后发现，原来爱早已将我们包围。当我们透过浪花，穿过波涛，我们不再被视角束缚，我们会发现，薄薄的浪下，是深不见底的大海。浪再大也还是激荡在海里，我们无法做到完全的恨，只是因为，恨的本质仍然是爱。"},
 		],
 	},
 }
@@ -194,5 +191,5 @@ static func segment(story_id: String) -> Dictionary:
 	return {}
 
 
-static func has_story(story_id: String) -> bool:
+static func has_segment(story_id: String) -> bool:
 	return SEGMENTS.has(story_id)

@@ -11,13 +11,22 @@ extends Node
 
 signal playback_finished
 
-@export_range(-40.0, 6.0, 0.5) var volume_db := -4.0
+## 语音音量
+@export_range(-40.0, 12.0, 0.5) var volume_db := 3.0
+
+## 语音加速倍率（1.0 = 原速）。原始语音 6~9 秒太长，压到 2.2 倍速 ≈ 3 秒。
+@export_range(1.0, 4.0, 0.05) var speed_scale := 2.2
+
+## 最长播放时长（秒）。超过就自动停 —— 语音只是提示，不该拖住节奏。
+@export_range(0.5, 10.0, 0.1) var max_seconds := 2.6
 @export var voice_enabled := true
 
 ## 同时最多几路（避免上一句没播完就被掐断时爆音）
 const VOICES := 2
 
 var _players: Array[AudioStreamPlayer] = []
+## 每个播放器的"停止令牌"，防止旧定时器误停新语音
+var _stop_tokens := {}
 var _cache := {}
 var _index := 0
 
@@ -44,8 +53,27 @@ func play(pattern: String, speaker: String) -> bool:
 	player.stop()
 	player.stream = stream
 	player.volume_db = volume_db
+	# pitch_scale 同时改变速度和音调；语音加速后更紧凑
+	player.pitch_scale = speed_scale
 	player.play()
+	# 到点强制停（防止个别长语音拖太久）
+	_schedule_stop(player)
 	return true
+
+
+## max_seconds 后停掉这个播放器（若还在播同一段）
+func _schedule_stop(player: AudioStreamPlayer) -> void:
+	var token := Time.get_ticks_msec()
+	_stop_tokens[player.get_instance_id()] = token
+	var timer := get_tree().create_timer(max_seconds)
+	timer.timeout.connect(func() -> void:
+		if not is_instance_valid(player):
+			return
+		var cur = _stop_tokens.get(player.get_instance_id(), -1)
+		if cur != token:
+			return      # 已经播了新的语音，不要误停
+		player.stop()
+	)
 
 
 ## 按句子文本播放：自动反查长度型。speaker 由调用方给（father / mother）。
