@@ -68,6 +68,10 @@ var _kind_run := 0
 var _last_kind := ""
 ## 上一句的档位 1~5
 var _last_tier := 3
+## 连续同「侧」句数（-1 坏 / 0 中 / +1 好）
+## 判上限必须按侧算：坏2→坏1 交替时"同档位"计数会被重置，导致连续坏句不受控
+var _side_run := 0
+var _last_side := 0
 
 @onready var title_label: Label = %TitleLabel
 @onready var state_label: Label = %StateLabel
@@ -785,6 +789,8 @@ func _advance_sentence(message: String) -> void:
 		current_kind = _tier_kind(current_tier)
 		_kind_run = 1
 		_last_tier = current_tier
+		_last_side = _tier_side(current_tier)
+		_side_run = 1
 		_last_kind = current_kind
 	else:
 		# 闪现触发后，接下来几句改成从"偷听到的"好句子池抽
@@ -897,6 +903,8 @@ func _reset_draw_state() -> void:
 	_kind_run = 0
 	_last_kind = ""
 	_last_tier = 3
+	_side_run = 0
+	_last_side = 0
 
 
 func _used_key(phase: String, kind: String) -> String:
@@ -972,11 +980,15 @@ func _pick_next_tier() -> int:
 			else:
 				w[t] *= 1.0 + 0.50 * run_f
 
-	# 硬上限：同侧连续太多就禁掉整个同侧
-	if _kind_run >= int(TIER_MAX_RUN.get(_last_tier, 4)):
-		var side := _tier_side(_last_tier)
+	# 硬上限：按『同侧』算（坏侧 2 句，中/好侧 4 句）
+	var side_cap := 4
+	if _last_side < 0:
+		side_cap = 2
+	elif _last_side == 0:
+		side_cap = 4
+	if _side_run >= side_cap:
 		for t in tiers:
-			if _tier_side(t) == side:
+			if _tier_side(t) == _last_side:
 				w[t] = 0.0
 
 	var total := 0.0
@@ -1052,6 +1064,12 @@ func _draw_sentence(kind: String, tier: int = 0) -> Dictionary:
 	else:
 		_kind_run = 1
 		_last_tier = picked_tier
+	var picked_side := _tier_side(picked_tier)
+	if picked_side == _last_side:
+		_side_run += 1
+	else:
+		_side_run = 1
+		_last_side = picked_side
 	_last_kind = _tier_kind(picked_tier)
 	return pick
 
