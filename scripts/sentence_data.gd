@@ -212,6 +212,18 @@ const POOLS := {
 		"negative": [
 		],
 	},
+	"final": {
+		## 好感满后的终章句子池：独立于所有数值，按顺序逐句打完
+		"positive": [
+			{"text": "那些奖状我们真是舍不得拿下来", "pinyin": ["na", "xie", "jiang", "zhuang", "wo", "men", "zhen", "shi", "she", "bu", "de", "na", "xia", "lai"]},
+			{"text": "你可争气呢我们都为你骄傲", "pinyin": ["ni", "ke", "zheng", "qi", "ne", "wo", "men", "dou", "wei", "ni", "jiao", "ao"]},
+			{"text": "爸爸妈妈还能再活一百年", "pinyin": ["ba", "ba", "ma", "ma", "hai", "neng", "zai", "huo", "yi", "bai", "nian"]},
+			{"text": "人去世之后会变成星星吧", "pinyin": ["ren", "qu", "shi", "zhi", "hou", "hui", "bian", "cheng", "xing", "xing", "ba"]},
+			{"text": "如果我们走了你是不是会轻松一点", "pinyin": ["ru", "guo", "wo", "men", "zou", "le", "ni", "shi", "bu", "shi", "hui", "qing", "song", "yi", "dian"]},
+		],
+		"neutral": [],
+		"negative": [],
+	},
 }
 
 

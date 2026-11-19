@@ -68,7 +68,12 @@ func play(sentence: String, progress: float) -> void:
 	_text = sentence
 	_target_inner = inner_ratio_for(progress)
 
-	# 跨阶段：进度突然变小，说明进了新阶段，内圆该从头长
+	# 【稳定性关键】被打断时 _commit_inner 可能没跑过，
+	# 所以开场一律以「屏幕上此刻实际画着的尺寸」为起点，
+	# 而不是沿用可能已经过期的 _prev_inner。
+	_prev_inner = _inner
+
+	# 跨阶段：新目标明显比当前小 → 说明进了新阶段，内圆该从头长
 	if _target_inner < _prev_inner - 0.15:
 		_prev_inner = R_IN_MIN
 
@@ -111,6 +116,8 @@ func hide_now() -> void:
 		_fade_tween.kill()
 	if _inner_tween != null and _inner_tween.is_valid():
 		_inner_tween.kill()
+	# 记下被打断时画到的位置，下次从它继续，避免尺寸跳变
+	_prev_inner = _inner
 	_alpha = 0.0
 	visible = false
 	queue_redraw()

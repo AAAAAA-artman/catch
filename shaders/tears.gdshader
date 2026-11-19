@@ -56,13 +56,13 @@ uniform float vignette_softness : hint_range(0.1, 1.0) = 0.55;
 
 // ---------------- 水珠 ----------------
 // 水珠数量与强度
-uniform float droplet_amount : hint_range(0.0, 1.0) = 0.65;
+uniform float droplet_amount : hint_range(0.0, 1.0) = 0.85;
 // 每颗水珠的半径（UV 单位）—— 水珠周围这一片会被模糊
-uniform float droplet_radius : hint_range(0.02, 0.30) = 0.10;
+uniform float droplet_radius : hint_range(0.02, 0.30) = 0.115;
 // 水珠边缘模糊圈的厚度倍率
-uniform float droplet_blur_scale : hint_range(1.0, 3.0) = 1.7;
+uniform float droplet_blur_scale : hint_range(1.0, 3.0) = 2.2;
 // 水珠内部的高光强度
-uniform float droplet_highlight : hint_range(0.0, 1.0) = 0.55;
+uniform float droplet_highlight : hint_range(0.0, 1.0) = 0.62;
 uniform float droplet_boost : hint_range(0.0, 2.0) = 1.0;
 
 // 时间（脚本推进）
@@ -131,13 +131,16 @@ void fragment() {
 		// ---- 6. 水珠：每颗水珠模糊它周围一片 ----
 		vec3 colorAcc = col;
 		float totalBlur = 0.0;
-		for (int i = 0; i < 6; i++) {
+		for (int i = 0; i < 8; i++) {
 			float fi = float(i);
 			// 水珠位置（归一化），每颗大小略有不同
 			vec2 dcenter = vec2(
 				hash21(vec2(fi * 3.1, 1.7)) * 0.88 + 0.06,
 				hash21(vec2(fi * 7.3, 5.3)) * 0.88 + 0.06
 			);
+			// 缓慢漂移，让水珠像"挂在镜片上"而不是死点
+			dcenter += vec2(sin(time_sec * 0.31 + fi * 1.7),
+				cos(time_sec * 0.42 + fi * 2.3)) * 0.020;
 			float dr = droplet_radius * (0.65 + hash21(vec2(fi, 9.1)) * 0.7);
 			float flick = 0.9 + 0.1 * sin(time_sec * 1.7 + fi * 2.3);
 

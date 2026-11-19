@@ -164,6 +164,14 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_update_mood_layer()
+	# 终章：只累计用时（不计时、不加压力、不跑环境音）
+	if phase == "final":
+		if input_lock_left > 0.0:
+			input_lock_left = maxf(0.0, input_lock_left - delta)
+		phrase_elapsed += delta
+		_update_ambient()
+		_update_stress_audio()
+		return
 	if phase != "playing":
 		return
 	# ---- 语音等待：播完才放开输入 ----
@@ -362,6 +370,10 @@ func _start_game(mode: String) -> void:
 	_phase3_first_round = -1
 	_ending_muted = false
 	_reset_phase3_tears()
+	# 终章状态复位
+	_final_queue.clear()
+	_final_done = 0
+	_set_final_hud(false)
 	if tears_fx != null:
 		tears_fx.hide_now()
 	# 恢复对话框位置（上一局第三阶段可能把它移开了）
@@ -729,6 +741,26 @@ func _on_text_changed(value: String) -> void:
 		if input_box != null:
 			input_box.text = ""
 		return
+	# ---- 终章：输错不重来，只退掉打错的那一位 ----
+	if phase == "final":
+		if input_lock_left > 0.0:
+			return
+		if not current_target.begins_with(value):
+			if input_box != null and not value.is_empty():
+				var trimmed := value.left(value.length() - 1)
+				input_box.text = trimmed
+				input_box.caret_column = trimmed.length()
+				_last_input_length = trimmed.length()
+			if sfx_player != null:
+				sfx_player.play_mistake()
+			return
+		_play_typing_sfx(value)
+		if not value.is_empty():
+			has_started_typing = true
+		_update_typing_progress(value)
+		if value == current_target:
+			_complete_final_sentence()
+		return
 	if phase != "playing":
 		return
 	if input_lock_left > 0.0:
@@ -764,6 +796,9 @@ func _on_text_changed(value: String) -> void:
 
 
 func _complete_sentence() -> void:
+	if phase == "final":
+		_complete_final_sentence()
+		return
 	var length := current_target.length()
 	var speed := float(length) * 60.0 / maxf(phrase_elapsed, 0.5)
 	correct_characters += length
@@ -1226,7 +1261,8 @@ func _on_story_finished(_segment_id: String) -> void:
 			_advance_sentence(pending_message)
 			_sync_bgm_for_act()
 		"ending":
-			_end_game(true)
+			# 好感满、结局剧情演完 → 进入终章句子池；打完全部才算真正结束
+			_start_final_phase()
 	story_resume = ""
 
 
@@ -1277,6 +1313,112 @@ var _last_input_length := 0
 var _curved_sentence_nodes: Array[Node2D] = []
 ## 对话框字格逐字浮现用的 tween
 var _cell_tween: Tween = null
+# ============================================================ 终章（好感满后）
+## 好感度满、结局剧情演完之后进入。
+## 这一段的规则和主流程完全独立：
+##   · 压力 / 麻木 / 时间条全部隐藏，也不再变化
+##   · 只从 sentence_data 的 "final" 池按顺序取句
+##   · 输错不用整句重打，只退掉错的那一位
+##   · 全部打完 → 游戏正式结束
+
+func _start_final_phase() -> void:
+	phase = "final"
+	_final_queue = SentenceData.pool("final", "positive").duplicate()
+	_final_done = 0
+	_set_final_hud(true)
+	# 数值全部冻结（显示也用不到）
+	pressure = 0.0
+	numbness = 0.0
+	if ambient != null:
+		ambient.stop_all()
+	if stress_audio != null:
+		stress_audio.stop_all()
+	# 照片保持全屏、泪眼保持最重，情绪不断
+	if phase3_gallery != null:
+		if not phase3_gallery.is_active():
+			phase3_gallery.set_active(true)
+		if not phase3_gallery.is_expanded():
+			phase3_gallery.expand_to_full()
+	# 终章固定用「居中透明面板」的布局
+	if not _dialog_hidden_p3:
+		_promote_dialog_center(true)
+	if p3_tears != null:
+		p3_tears.set_level(1.0, 3.8, 2.2)
+	_advance_final_sentence("")
+
+
+## 隐藏 / 恢复「压力、麻木、时间」三组 HUD
+func _set_final_hud(hide_them: bool) -> void:
+	for node in [time_bar, pressure_bar, numbness_bar,
+			get_node_or_null("TimeCaption"),
+			get_node_or_null("PressureCaption"),
+			get_node_or_null("NumbnessCaption")]:
+		if node != null:
+			node.visible = not hide_them
+
+
+func _advance_final_sentence(message: String) -> void:
+	if _final_queue.is_empty():
+		_end_game(true)
+		return
+	var entry: Dictionary = _final_queue.pop_front()
+	_final_done += 1
+	current_kind = "positive"
+	current_sentence = String(entry["text"])
+	current_pinyin = PackedStringArray(entry["pinyin"])
+	current_target = current_sentence if input_mode == "hanzi" else " ".join(current_pinyin)
+	last_sentence = current_sentence
+	# 不计时：给一个很大的值，UI 也已隐藏
+	time_limit = 9999.0
+	time_left = 9999.0
+	phrase_elapsed = 0.0
+	phrase_mistakes = 0
+	input_lock_left = 0.0
+	voice_waiting = false
+	_voice_wait_elapsed = 0.0
+	has_started_typing = false
+	error_flash = false
+	error_flash_id += 1
+	if cursor_tween and cursor_tween.is_running():
+		cursor_tween.kill()
+	cursor_rect.hide()
+	input_box.text = ""
+	_last_input_length = 0
+	input_box.editable = input_mode == "hanzi"
+	input_box.visible = input_mode == "hanzi" and not _dialog_hidden_p3
+	if input_mode == "hanzi":
+		input_box.call_deferred("grab_focus")
+	else:
+		input_box.release_focus()
+	state_label.text = message
+	state_label.visible = not _dialog_hidden_p3
+	sentence_label.hide()
+	hanzi_row.visible = input_mode == "hanzi"
+	pinyin_row.visible = input_mode == "pinyin"
+	if input_mode == "pinyin":
+		_build_pinyin_cells()
+	else:
+		_build_hanzi_cells()
+	_update_typing_progress("")
+	call_deferred("_place_cursor_after_layout")
+	_spawn_curved_sentence(current_sentence, "positive")
+
+
+func _complete_final_sentence() -> void:
+	_fade_out_curved_sentence()
+	# 不加好感、不加压力、不加分 —— 和所有资源无关
+	if sfx_player != null:
+		sfx_player.play_sentence_complete()
+	if _final_queue.is_empty():
+		state_label.text = "全部接住了"
+		_show_feedback("全部接住了。", Color("fff2c8"))
+		await get_tree().create_timer(1.1).timeout
+		_end_game(true)
+		return
+	_show_feedback("接住了。", Color("f7d292"))
+	_advance_final_sentence("")
+
+
 ## 第三阶段：每接受一句话，画面就往「泪眼模糊」推一档。
 ## 强度只增不减，模拟主角逐渐控制不住地流泪。
 func _build_up_phase3_tears() -> void:
@@ -1287,7 +1429,7 @@ func _build_up_phase3_tears() -> void:
 	_p3_tears_level = minf(P3_TEARS_MAX, _p3_tears_level + P3_TEARS_STEP)
 	# 越往后越糊：blur 倍率随强度递增
 	var blur_boost := lerpf(1.5, 3.8, _p3_tears_level)
-	var drop_boost := lerpf(0.9, 1.9, _p3_tears_level)
+	var drop_boost := lerpf(1.3, 2.6, _p3_tears_level)
 	p3_tears.set_level(_p3_tears_level, blur_boost, drop_boost)
 
 
@@ -1309,7 +1451,10 @@ var _phase3_first_round := -1
 ## 结尾剧情开始后：环境音 / 心跳呼吸全部静音
 var _ending_muted := false
 ## 第三阶段当前泪水强度 0~1
-var _p3_tears_level := 0.0## 面板原始背景样式（移到中央时换透明）
+var _p3_tears_level := 0.0
+## 终章（好感满后的独立句子池）剩余句子
+var _final_queue: Array = []
+var _final_done := 0## 面板原始背景样式（移到中央时换透明）
 var _dialog_home_style: StyleBox = null
 ## 父母合影闪现是否已触发过（一个阶段只触发一次）
 var _parents_flash_fired := false
@@ -1575,7 +1720,9 @@ func _play_circle_result() -> void:
 	# 让特效拿到游戏用的中文字体（默认字体没有汉字）
 	if circle_fx.has_method("set_font"):
 		circle_fx.set_font(_game_font_resource())
-	circle_fx.play(current_sentence, _stage_affection_progress())
+	# 用「按阶段句数 + 阶段起点」算的进度，和画面/剧情判定一致；
+	# 不再用按好感阈值切段的 _stage_affection_progress（两者会打架导致跳变）
+	circle_fx.play(current_sentence, _stage_progress())
 
 
 # ============================================================ 第一阶段画面动态
@@ -1590,8 +1737,9 @@ func _mood_progress() -> float:
 
 func _update_mood_layer() -> void:
 	# 只有真正在游玩/剧情里才显示（标题画面不显示）
-	var in_game := phase in ["playing", "story", "won", "lost"]
-	var stage := _story_stage()          # 1 / 2 / 3
+	var in_game := phase in ["playing", "story", "won", "lost", "final"]
+	# 终章沿用第三阶段的画面（全屏照片 + 居中面板）
+	var stage := 3 if phase == "final" else _story_stage()
 	var want_mood1 := in_game and stage <= 1
 	# 第三阶段第一句仍保留二阶段房间画面，
 	# 等打完第一句（画廊展开）才切走，这样第一句和之前完全一样。
@@ -1801,7 +1949,7 @@ func _stage3_progress() -> float:
 func _update_ambient() -> void:
 	if ambient == null:
 		return
-	var in_game := phase in ["playing", "story", "won", "lost"]
+	var in_game := phase in ["playing", "story", "won", "lost", "final"]
 	# 结尾剧情开始后，环境音彻底停掉（包括胜利结算画面）
 	if _ending_muted:
 		in_game = false
@@ -1812,7 +1960,7 @@ func _update_ambient() -> void:
 func _update_stress_audio() -> void:
 	if stress_audio == null:
 		return
-	var in_game := phase in ["playing", "story", "won", "lost"]
+	var in_game := phase in ["playing", "story", "won", "lost", "final"]
 	if _ending_muted:
 		in_game = false
 	stress_audio.update_state(pressure, in_game)
