@@ -211,6 +211,7 @@ func _ready() -> void:
 	_load_records()
 	input_box.text_changed.connect(_on_text_changed)
 	story_overlay.finished.connect(_on_story_finished)
+	_hide_stat_labels()
 	_create_main_menu()
 	_build_pause_menu()
 	_build_tutorial_overlay()
@@ -764,6 +765,17 @@ func _quit_game() -> void:
 
 
 ## 创建主界面（代码生成，不改场景文件）
+## 永久隐藏顶部「第 X / 30 句」和「分数/准确率/最快」这两块统计
+func _hide_stat_labels() -> void:
+	if round_label != null:
+		round_label.visible = false
+	if stats_label != null:
+		stats_label.visible = false
+	var sb := get_node_or_null("StatsBack")
+	if sb != null:
+		sb.visible = false
+
+
 func _create_main_menu() -> void:
 	var script_res := load("res://scripts/main_menu.gd")
 	if script_res == null:
@@ -822,9 +834,6 @@ func _set_game_hud_visible(on: bool) -> void:
 			get_node_or_null("PressureCaption"),
 			get_node_or_null("NumbnessCaption"),
 			get_node_or_null("%SentencePanel"),
-			get_node_or_null("%RoundLabel"),
-			get_node_or_null("%StatsLabel"),
-			get_node_or_null("StatsBack"),
 			circle_fx, tears_fx, p3_tears,
 			get_node_or_null("Stage"), get_node_or_null("Backdrop")]:
 		if node != null:
@@ -863,7 +872,8 @@ func _show_title() -> void:
 	input_box.text = ""
 	_last_input_length = 0  # 换句/进剧情时同步重置击键计数
 	input_box.editable = false
-	round_label.text = "1 汉字   2 拼音"
+	if round_label != null and false:
+		round_label.text = "1 汉字   2 拼音"
 	_refresh_stats()
 	_update_bars()
 	_clear_curved_text()
@@ -1009,7 +1019,8 @@ func _advance_sentence(message: String) -> void:
 		_build_hanzi_cells()
 	_update_typing_progress("")
 	call_deferred("_place_cursor_after_layout")
-	round_label.text = "第 %d / %d 句" % [round_number, MAX_ROUNDS]
+	if round_label != null and false:
+		round_label.text = "第 %d / %d 句" % [round_number, MAX_ROUNDS]
 	input_box.placeholder_text = "在这里输入汉字"
 	_refresh_stats()
 	if hud_layout != null:
@@ -1661,7 +1672,8 @@ func _end_game(won: bool) -> void:
 	sentence_label.show()
 	sentence_label.text = "你接住她们了" if won else (_game_over_text if _game_over_text != "" else "这场对话暂时结束了。")
 	state_label.text = "胜利 · 好感度已满" if won else "失败"
-	round_label.text = "R 重玩   1 汉字   2 拼音"
+	if round_label != null and false:
+		round_label.text = "R 重玩   1 汉字   2 拼音"
 	_save_records()
 	_refresh_stats()
 	_spawn_curved_banner(sentence_label.text, "positive" if won else "cold", 7.0)
@@ -2558,9 +2570,11 @@ func _mood_progress() -> float:
 
 func _update_mood_layer() -> void:
 	# 只有真正在游玩/剧情里才显示（标题画面不显示）
-	var in_game := phase in ["playing", "story", "won", "lost", "final"]
+	# paused 也算在对局里：否则暂停时 _update_mood_layer 会把画面层全关掉，
+	# 终章按 Esc 再回来时三阶段照片被 set_active 重新初始化（重播入场交替）
+	var in_game := phase in ["playing", "story", "won", "lost", "final", "paused"]
 	# 终章沿用第三阶段的画面（全屏照片 + 居中面板）
-	var stage := 3 if phase == "final" else _story_stage()
+	var stage := 3 if (phase == "final" or (phase == "paused" and _paused_from == "final")) else _story_stage()
 	var want_mood1 := in_game and stage <= 1
 	# 第三阶段第一句仍保留二阶段房间画面，
 	# 等打完第一句（画廊展开）才切走，这样第一句和之前完全一样。
