@@ -52,8 +52,15 @@ uniform float tint_amount : hint_range(0.0, 0.5) = 0.08;
 uniform float vignette : hint_range(0.0, 1.5) = 0.34;
 uniform float vignette_softness : hint_range(0.1, 1.0) = 0.55;
 
-// ---------------- 水珠高光 ----------------
-uniform float droplet_amount : hint_range(0.0, 1.0) = 0.20;
+// ---------------- 水珠 ----------------
+// 水珠数量与强度
+uniform float droplet_amount : hint_range(0.0, 1.0) = 0.65;
+// 每颗水珠的半径（UV 单位）—— 水珠周围这一片会被模糊
+uniform float droplet_radius : hint_range(0.02, 0.30) = 0.10;
+// 水珠边缘模糊圈的厚度倍率
+uniform float droplet_blur_scale : hint_range(1.0, 3.0) = 1.7;
+// 水珠内部的高光强度
+uniform float droplet_highlight : hint_range(0.0, 1.0) = 0.55;
 
 // 时间（脚本推进）
 uniform float time_sec = 0.0;
@@ -118,19 +125,43 @@ void fragment() {
 		float vig = smoothstep(0.5, vignette_softness, dist * 1.42);
 		col *= 1.0 - vig * vignette * strength;
 
-		// ---- 6. 水珠高光 ----
-		// 几个随机位置的亮点，随时间轻微飘动
-		for (int i = 0; i < 5; i++) {
+		// ---- 6. 水珠：每颗水珠模糊它周围一片 ----
+		vec3 colorAcc = col;
+		float totalBlur = 0.0;
+		for (int i = 0; i < 6; i++) {
 			float fi = float(i);
-			vec2 center = vec2(
-				hash21(vec2(fi, 1.7)) * 0.9 + 0.05,
-				hash21(vec2(fi, 5.3)) * 0.9 + 0.05
+			// 水珠位置（归一化），每颗大小略有不同
+			vec2 dcenter = vec2(
+				hash21(vec2(fi * 3.1, 1.7)) * 0.88 + 0.06,
+				hash21(vec2(fi * 7.3, 5.3)) * 0.88 + 0.06
 			);
-			float flick = 0.85 + 0.15 * sin(time_sec * 2.1 + fi * 2.3);
-			float d = length(uv - center);
-			float glow = smoothstep(0.045, 0.0, d) * flick;
-			col += vec3(0.55, 0.65, 0.85) * glow * droplet_amount * strength * 0.35;
+			float dr = droplet_radius * (0.65 + hash21(vec2(fi, 9.1)) * 0.7);
+			float flick = 0.9 + 0.1 * sin(time_sec * 1.7 + fi * 2.3);
+
+			// 水珠内圈（实心区域，模糊最强）
+			float d = length(uv - dcenter);
+			float inner = smoothstep(dr, dr * 0.35, d);
+
+			if (inner > 0.001) {
+				// 这一片单独再模糊一次，模拟透过水珠折射
+				float localBlur = blur_amount * strength * droplet_blur_scale * dr * 18.0;
+				vec3 blurred = blur_sample(sample_uv + (uv - dcenter) * 0.06, localBlur);
+				// 水珠里的画面：模糊 + 轻微放大 + 提亮
+				vec3 dropletCol = mix(colorAcc, blurred * 1.12, inner);
+				// 水珠内的高光点（偏左上）
+				vec2 hl = dcenter + vec2(-dr * 0.32, -dr * 0.32);
+				float hd = length(uv - hl);
+				float glow = smoothstep(dr * 0.55, 0.0, hd) * flick;
+				dropletCol += vec3(0.85, 0.92, 1.0) * glow * droplet_highlight * strength;
+				// 水珠外缘的暗边（模拟表面张力）
+				float rim = smoothstep(dr * 1.05, dr * 0.92, d) * smoothstep(dr * 0.85, dr * 0.98, d);
+				dropletCol *= 1.0 - rim * 0.18 * strength;
+
+				colorAcc = mix(colorAcc, dropletCol, inner * droplet_amount);
+				totalBlur = max(totalBlur, inner);
+			}
 		}
+		col = colorAcc;
 
 		COLOR = vec4(col, 1.0);
 	}

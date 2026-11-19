@@ -392,7 +392,7 @@ func _advance_sentence(message: String) -> void:
 	current_kind = kind_deck[round_number - 1]
 	# 闪现触发后，接下来几句改成从"偷听到的"好句子池抽
 	var entry: Dictionary
-	if _overheard_pending():
+	if _is_special_sentence():
 		entry = _draw_overheard()
 		if not entry.is_empty():
 			current_kind = "positive"
@@ -1212,7 +1212,10 @@ var _cell_tween: Tween = null
 ## 父母合影闪现是否已触发过（一个阶段只触发一次）
 var _parents_flash_fired := false
 ## 本阶段还要从 overheard 池抽几句（>0 表示正在用偷听句子）
-var _overheard_left := 0
+## 特殊句的编排：本阶段每句是否为特殊句
+var _special_plan: Array[bool] = []
+## 本阶段第几句（0 开始）
+var _special_index := 0
 ## 这一阶段用过的偷听句（避免重复）
 var _overheard_used: Array[String] = []
 
@@ -1573,33 +1576,74 @@ func _find_break_point(body: String, mid: int, capacity: int) -> int:
 func _update_parents_flash(in_game: bool) -> void:
 	if parents_flash == null:
 		return
-	# 只有第二阶段、且进度到阈值才闪
-	var should_flash := in_game \
-		and _story_stage() == 2 \
-		and _stage2_progress() >= PARENTS_FLASH_AT
 
-	if should_flash and not _parents_flash_fired:
+	# 第二阶段、且进度到阈值之后才启用这套「特殊句」机制
+	var enabled := in_game and _story_stage() == 2 and _stage2_progress() >= PARENTS_FLASH_AT
+
+	if enabled and not _parents_flash_fired:
 		_parents_flash_fired = true
-		# 触发时切换到"偷听到的"好句子池
-		_overheard_left = OVERHEARD_SENTENCES
 		_overheard_used.clear()
-		print("[剧情] 父母合影闪现触发，接下来 ", OVERHEARD_SENTENCES, " 句来自偷听到的对话")
-		parents_flash.begin_flash()
-	elif not should_flash and _parents_flash_fired:
-		# 离开第二阶段（或退回去）就停
+		_build_special_plan()
+		print("[剧情] 特殊句编排生效：", _special_plan)
+	elif not enabled and _parents_flash_fired:
 		_parents_flash_fired = false
-		parents_flash.stop_flash()
+		_special_plan.clear()
+		parents_flash.end_show()
 
-	if parents_flash.is_flashing() != should_flash:
-		if should_flash:
-			parents_flash.begin_flash()
-		else:
-			parents_flash.stop_flash()
+	# 父母合影只在「特殊句」期间淡入，普通句淡出
+	var want_show := enabled and _is_special_sentence()
+	if want_show:
+		parents_flash.begin_show()
+	else:
+		parents_flash.end_show()
 
 
-## 是否该从 overheard 池抽句（闪现触发后紧接着的几句）
-func _should_use_overheard() -> bool:
-	return _overheard_left > 0
+## 本阶段特殊句编排规则：
+##   · 以「1 句特殊 → 1 句普通 → 2 句特殊」为一个循环
+##   · 阶段内**最后一句一定是特殊句**
+##   · 只有特殊句会触发父母合影浮现
+func _build_special_plan() -> void:
+	var total := ROUNDS_PER_STAGE
+	_special_plan.clear()
+	_special_plan.resize(total)
+	# 编排节奏：特 → 普 → 特 → 特 → 普 → 特 → 特 → 普 ...
+	# 也就是「1句特殊 → 1句普通 → 2句特殊」循环，
+	# 让每轮结尾的特殊和下一轮开头的普通错开，避免连着一长串都是特殊。
+	var i := 0
+	while i < total:
+		_special_plan[i] = true          # 1 句特殊
+		i += 1
+		if i >= total:
+			break
+		_special_plan[i] = false         # 1 句普通
+		i += 1
+		if i >= total:
+			break
+		_special_plan[i] = true          # 2 句特殊
+		i += 1
+		if i >= total:
+			break
+		_special_plan[i] = true
+		i += 1
+		# 下一轮先来一句普通（避免连续特殊）
+		if i < total:
+			_special_plan[i] = false
+			i += 1
+	# 最后一句强制特殊（临近尾声一定触发浮现）
+	_special_plan[total - 1] = true
+	# 最后两句也保证至少有一句特殊，让收尾更有仪式感
+	if total >= 2 and not _special_plan[total - 2]:
+		_special_plan[total - 2] = true
+
+
+## 当前这句是不是特殊句
+func _is_special_sentence() -> bool:
+	if _special_plan.is_empty():
+		return false
+	var idx := _stage_index_in_stage()
+	if idx < 0 or idx >= _special_plan.size():
+		return false
+	return _special_plan[idx]
 
 
 ## 从 overheard 好句子池拿一句（用完就减一）
@@ -1617,13 +1661,7 @@ func _draw_overheard() -> Dictionary:
 		fresh = bag.duplicate()
 	var pick: Dictionary = fresh[randi() % fresh.size()]
 	_overheard_used.append(String(pick["text"]))
-	_overheard_left = maxi(0, _overheard_left - 1)
 	return pick
-
-
-## 闪现触发后，本阶段接下来该用偷听句（且还没用完）
-func _overheard_pending() -> bool:
-	return _overheard_left > 0
 
 
 ## 阶段三进度 0~1（好感度 2/3 → 满）
