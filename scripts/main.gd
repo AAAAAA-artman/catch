@@ -205,6 +205,7 @@ func _ready() -> void:
 	input_box.text_changed.connect(_on_text_changed)
 	story_overlay.finished.connect(_on_story_finished)
 	_create_main_menu()
+	_build_pause_menu()
 	_show_menu()
 	if bgm_player != null:
 		bgm_player.play("res://audio/bgm/intro_circulation.mp3")
@@ -278,19 +279,16 @@ func _input(event: InputEvent) -> void:
 	if phase == "story":
 		return
 	if key.keycode == KEY_ESCAPE:
+		if _pause_settings_open:
+			# 先关设置浮层，回到暂停菜单
+			_close_pause_settings()
+			accept_event()
+			return
 		if phase == "playing":
-			phase = "paused"
-			input_box.editable = false
-			state_label.text = "已暂停 · 按 Esc 继续"
-			pause_overlay.show()
+			_pause_game()
 			accept_event()
 		elif phase == "paused":
-			phase = "playing"
-			pause_overlay.hide()
-			input_box.editable = input_mode == "hanzi" and input_lock_left <= 0.0 and not voice_waiting
-			state_label.text = "正在对话"
-			if input_box.editable:
-				input_box.call_deferred("grab_focus")
+			_resume_game()
 			accept_event()
 		return
 	if phase == "menu":
@@ -375,6 +373,108 @@ func _apply_font_to_static_labels() -> void:
 			pass
 
 
+## 构建暂停菜单的四颗按钮（继续 / 设置 / 回主界面 / 离开）
+func _build_pause_menu() -> void:
+	var contents := pause_overlay.get_node_or_null("Center/PauseCard/PauseContents")
+	if contents == null:
+		return
+	var hint := contents.get_node_or_null("PauseHint") as Label
+	if hint != null:
+		hint.text = "Esc 继续对话 · 下面是菜单"
+
+	var specs := [
+		["继续游戏", _resume_game],
+		["设置", _open_pause_settings],
+		["返回主界面", _return_to_menu],
+		["离开游戏", _quit_game],
+	]
+	for it in specs:
+		var b := Button.new()
+		b.text = String(it[0])
+		b.custom_minimum_size = Vector2(300, 46)
+		b.focus_mode = Control.FOCUS_NONE
+		var font := _game_font_resource()
+		if font != null:
+			b.add_theme_font_override("font", font)
+		b.add_theme_font_size_override("font_size", 24)
+		b.add_theme_color_override("font_color", Color(0.93, 0.90, 0.84))
+		b.add_theme_color_override("font_hover_color", Color(1.0, 0.96, 0.78))
+		var st := StyleBoxFlat.new()
+		st.bg_color = Color(1, 1, 1, 0.05)
+		st.border_color = Color(1.0, 0.94, 0.0, 0.35)
+		st.set_border_width_all(1)
+		st.set_corner_radius_all(6)
+		b.add_theme_stylebox_override("normal", st)
+		var hv := st.duplicate() as StyleBoxFlat
+		hv.bg_color = Color(1, 1, 1, 0.14)
+		b.add_theme_stylebox_override("hover", hv)
+		b.pressed.connect(it[1])
+		contents.add_child(b)
+
+
+func _pause_game() -> void:
+	if phase != "playing":
+		return
+	phase = "paused"
+	if resisting:
+		_end_resist()
+	input_box.editable = false
+	state_label.text = "已暂停"
+	pause_overlay.show()
+
+
+func _resume_game() -> void:
+	if phase != "paused":
+		return
+	if _pause_settings_open:
+		_close_pause_settings()
+		return
+	phase = "playing"
+	pause_overlay.hide()
+	input_box.editable = input_mode == "hanzi" and input_lock_left <= 0.0 and not voice_waiting
+	state_label.text = "正在对话"
+	_apply_input_box_visibility()
+	if input_box.editable:
+		input_box.call_deferred("grab_focus")
+
+
+func _open_pause_settings() -> void:
+	if main_menu == null:
+		return
+	_pause_settings_open = true
+	pause_overlay.hide()
+	main_menu.call("open_settings_overlay")
+
+
+func _close_pause_settings() -> void:
+	_pause_settings_open = false
+	if main_menu != null:
+		main_menu.call("close_settings_overlay")
+	# 回到暂停菜单
+	pause_overlay.show()
+
+
+func _return_to_menu() -> void:
+	if voice_player != null:
+		voice_player.stop_all()
+	if sfx_player != null:
+		sfx_player.stop_all()
+	if ambient != null:
+		ambient.stop_all()
+	if stress_audio != null:
+		stress_audio.stop_all()
+	_end_resist()
+	_set_tension(false)
+	_clear_curved_text()
+	_pause_settings_open = false
+	pause_overlay.hide()
+	_show_menu()
+
+
+func _quit_game() -> void:
+	get_tree().quit()
+
+
 ## 创建主界面（代码生成，不改场景文件）
 func _create_main_menu() -> void:
 	var script_res := load("res://scripts/main_menu.gd")
@@ -399,6 +499,8 @@ func _create_main_menu() -> void:
 
 
 func _on_menu_start(mode: String) -> void:
+	_pause_settings_open = false
+	pause_overlay.hide()
 	if main_menu != null:
 		main_menu.close()
 	_set_game_hud_visible(true)
@@ -1607,6 +1709,8 @@ func _play_sentence_voice() -> void:
 var _last_input_length := 0
 ## 主界面（开始游戏 / 设置 / 离开）
 var main_menu: Control = null
+## 暂停菜单里是否开着设置浮层
+var _pause_settings_open := false
 ## 当前飘在画面上的句子节点（长句会拆成多行，所以是数组）
 var _curved_sentence_nodes: Array[Node2D] = []
 ## 对话框字格逐字浮现用的 tween
