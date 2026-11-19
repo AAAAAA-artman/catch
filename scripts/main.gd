@@ -91,6 +91,7 @@ var feedback_tween: Tween
 @onready var phase3_gallery: Control = %Phase3Gallery
 @onready var ambient: Node = $Ambient
 @onready var stress_audio: Node = $StressAudio
+@onready var tears_fx: Control = %TearsFx
 
 # ---- 剧情流程 ----
 # 五段剧情的统一叫法与 BGM 对应：
@@ -351,6 +352,8 @@ func _start_game(mode: String) -> void:
 		phase2_room.reset()
 	if phase3_gallery != null:
 		phase3_gallery.reset()
+	if tears_fx != null:
+		tears_fx.hide_now()
 	if ambient != null:
 		ambient.stop_all()
 	if stress_audio != null:
@@ -757,6 +760,8 @@ func _complete_sentence() -> void:
 		"negative":
 			affection = minf(MAX_VALUE, affection + affection_gain)
 			pressure = minf(MAX_VALUE, pressure + 18.0)
+			# 负面句：眼前涌上泪水
+			_play_tears()
 	_fade_out_curved_sentence()
 	_update_bars()
 	_save_records()
@@ -769,6 +774,15 @@ func _complete_sentence() -> void:
 	if _start_story_chain(message):
 		return
 	_advance_sentence(message)
+
+
+## 负面句结算时叠一层泪水滤镜。强度跟压力挂钩：
+## 压力越高，泪越重（25% ~ 100%）。
+func _play_tears() -> void:
+	if tears_fx == null:
+		return
+	var intensity := lerpf(0.55, 1.0, clampf(pressure / MAX_VALUE, 0.0, 1.0))
+	tears_fx.play(intensity)
 
 
 ## 本句涨多少好感度。
@@ -837,6 +851,8 @@ func _end_game(won: bool) -> void:
 	phase = "won" if won else "lost"
 	if circle_fx != null:
 		circle_fx.hide_now()
+	if tears_fx != null:
+		tears_fx.hide_now()
 	_end_resist()
 	if voice_player != null:
 		voice_player.stop_all()
@@ -1073,6 +1089,8 @@ func _play_story(story_id: String) -> void:
 	phase = "story"
 	if circle_fx != null:
 		circle_fx.hide_now()
+	if tears_fx != null:
+		tears_fx.hide_now()
 	story_seen[story_id] = true
 	input_box.editable = false
 	input_box.release_focus()
