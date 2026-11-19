@@ -189,6 +189,9 @@ const FINAL_IMAGES := [
 	"res://art/story/fin_4.jpg",
 ]
 
+## 终章 → Ending 期间循环播放的曲子
+const FINAL_BGM := "res://audio/bgm/out_of_love.mp3"
+
 const OPENERS := {
 	1: "你什么时候回来的",
 	2: "房门别关上啊",
@@ -647,6 +650,10 @@ func _close_tutorial() -> void:
 	input_box.editable = input_mode == "hanzi" and input_lock_left <= 0.0 and not voice_waiting
 	state_label.text = "正在对话"
 	_apply_input_box_visibility()
+	# 教程期间 phase != "playing"，_place_cursor_after_layout 会被跳过，
+	# 字格一直是没按真实宽度排过的状态（会变成巨大单字）。这里补一次。
+	_layout_sentence()
+	call_deferred("_place_cursor_after_layout")
 	if input_box.editable:
 		input_box.call_deferred("grab_focus")
 
@@ -879,6 +886,7 @@ func _start_game(mode: String) -> void:
 	_final_played = false
 	_final_finishing = false
 	_final_image_index = -1
+	_final_music_on = false
 	_set_final_hud(false)
 	if tears_fx != null:
 		tears_fx.hide_now()
@@ -1795,16 +1803,39 @@ func _spawn_curved_sentence(body: String, tone: String) -> void:
 		settings["rotate_follow"] = 1.0
 	var stage_size := _stage_size()
 	var line_gap := float(font_size) * 1.42
-	var center_y := stage_size.y * (0.30 if lines.size() <= 1 else 0.34)
+	# 一二阶段的飘字往下靠（原来在画框 30%/34%，现在移到 60%/64%）
+	var center_y := stage_size.y * (0.60 if lines.size() <= 1 else 0.64)
 	# 第三阶段面板会移到屏幕中央，飘字上移避免重叠
 	if _sentence_phase() == "phase3" and _dialog_hidden_p3:
 		center_y = stage_size.y * 0.14
+	var use_gradient: bool = phase_name != "phase3"
 	for i in lines.size():
 		var y := center_y + (float(i) - float(lines.size() - 1) * 0.5) * line_gap
 		var anchor := Vector2(stage_size.x * 0.5, y)
 		var node := TextFX.spawn(text_fx_root, lines[i], anchor, "reveal", settings)
 		if node != null:
+			if use_gradient:
+				_apply_arc_gradient(node, anchor, float(font_size))
 			_curved_sentence_nodes.append(node)
+
+
+## 给飘字套上「封面那种」上实下虚的渐变
+func _apply_arc_gradient(node: Node, anchor: Vector2, font_size: float) -> void:
+	if node == null or not (node is CanvasItem):
+		return
+	var shader_res := load("res://shaders/arc_text_gradient.gdshader")
+	if shader_res == null:
+		return
+	var mat := ShaderMaterial.new()
+	mat.shader = shader_res
+	# 渐变带：以文字所在高度为中心，上下各撑 1.1 个字高（换算成 0~1 屏幕坐标）
+	var vp := get_viewport_rect().size
+	# anchor 是 Stage/TextFx 的本地坐标，转成屏幕坐标
+	var world := text_fx_root.get_global_transform() * anchor
+	var half := font_size * 1.5
+	mat.set_shader_parameter("band_top", clampf((world.y - half) / vp.y, 0.0, 1.0))
+	mat.set_shader_parameter("band_bottom", clampf((world.y + half) / vp.y, 0.0, 1.0))
+	(node as CanvasItem).material = mat
 
 
 ## 把当前飘在画面上的句子淡出（打完 / 超时 / 进剧情时调用）
@@ -1907,6 +1938,10 @@ func _play_story(story_id: String) -> void:
 ## act1_intro 是过场，沿用上一段的曲子（Dream Street），不切歌。
 func _sync_bgm_for_story(story_id: String) -> void:
 	if bgm_player == null:
+		return
+	# 终章已经接管 BGM（OUT of love），结尾剧情期间不切歌
+	if _final_music_on:
+		bgm_player.play(FINAL_BGM)
 		return
 	var segment := StoryData.segment(story_id)
 	var bgm: String = segment.get("bgm", "")
@@ -2047,6 +2082,10 @@ func _start_final_phase() -> void:
 	_final_queue = SentenceData.pool("final", "positive").duplicate()
 	_final_done = 0
 	_set_final_hud(true)
+	# 终章开始换成 OUT of love，并一直 loop 到 ED 播完
+	_final_music_on = true
+	if bgm_player != null:
+		bgm_player.play(FINAL_BGM)
 	# 数值全部冻结（显示也用不到）
 	pressure = 0.0
 	numbness = 0.0
@@ -2202,6 +2241,8 @@ var _final_queue: Array = []
 var _final_done := 0
 ## 终章配图当前显示到第几张
 var _final_image_index := -1
+## 终章 BGM 已接管（进 epilogue 也不换歌）
+var _final_music_on := false
 ## 终章是否已经打过（决定 epilogue 的时机）
 var _final_played := false
 ## 终章收尾是否已经开始（防重复触发）
