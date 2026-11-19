@@ -20,55 +20,52 @@ func _initialize() -> void:
 
 	game._start_game("hanzi")
 	await _frames(4)
-	ov.finish_now()
-	await _frames(8)
+	await _skip_all_story()
 
-	# ---------- 抵抗：计时加速 ----------
-	print("\nR === 抵抗机制 ===")
-	var t0: float = game.time_left
-	var limit: float = game.time_limit
+	# ---------- 抵抗：固定 2.5 秒跳句 ----------
+	print("\nR === 抵抗机制（固定 2.5 秒）===")
 	sfx.stop_all()
-	game._begin_resist()
-	print("R 按下 Alt: resisting=", game.resisting, " 抵抗音播放=", sfx.is_resisting(),
-		" 剩余=%.2f/%.2f" % [t0, limit])
+	var t0: float = game.time_left
 	var numb0: float = game.numbness
+	var aff0: float = game.affection
+	var pre0: float = game.pressure
+	game._begin_resist()
+	print("R 按下 Alt: resisting=", game.resisting, " 抵抗音=", sfx.is_resisting(),
+		" 按住时长=", snappedf(game.RESIST_HOLD_TIME, 0.1), "s")
+	for i in range(60):
+		await process_frame
+	print("R 按住 1.0s: 剩余计时=", snappedf(game.resist_hold_left, 0.1), "（应约 1.5）")
+	print("R 本句时间不变: ", snappedf(t0, 1), " → ", snappedf(game.time_left, 1))
+	# 继续按到跳句（headless 帧率不稳定，用状态判断而不是死等帧数）
+	var guard := 0
+	while game.resisting and guard < 1200:
+		await process_frame
+		guard += 1
+	print("R 按住满: resisting=", game.resisting,
+		" 麻木 ", snappedf(numb0, 0.1), "→", snappedf(game.numbness, 0.1),
+		"（应 +", int(game.RESIST_NUMBNESS), "）")
+	print("R 好感 ", snappedf(aff0, 0.1), "→", snappedf(game.affection, 0.1),
+		"（应 -", int(game.RESIST_AFFECTION_LOSS), "）")
+	print("R 压力 ", snappedf(pre0, 0.1), "→", snappedf(game.pressure, 0.1), "（应不变）")
+
+	# ---------- 半途松手：不跳句 ----------
+	print("\nR === 半途松手 ===")
+	if game.phase == "story":
+		await _skip_all_story()
+	sfx.stop_all()
+	var n1: float = game.numbness
+	game._begin_resist()
 	for i in range(30):
 		await process_frame
-	var t1: float = game.time_left
-	print("R 按住 0.5s: 剩余 %.2f → %.2f (下降 %.2f，正常应 %.2f)" % [
-		t0, t1, t0 - t1, 30.0 / 60.0])
-	print("R 麻木 %.1f → %.1f (抵抗代价)" % [numb0, game.numbness])
-
-	# 松手
 	game._end_resist()
-	print("R 松开 Alt: resisting=", game.resisting, " 抵抗音播放=", sfx.is_resisting())
-	var t2: float = game.time_left
-	for i in range(15):
-		await process_frame
-	print("R 松手 0.25s: 剩余 %.2f → %.2f (下降 %.2f，应为正常速度)" % [
-		t2, game.time_left, t2 - game.time_left])
-
-	# ---------- 抵抗到时间归零 ----------
-	print("\nR === 抵抗到超时 ===")
-	if game.phase == "story":
-		ov.finish_now()
-		await _frames(6)
-	sfx.stop_all()
-	game.time_left = 0.3
-	var p0: float = game.pressure
-	game._begin_resist()
-	for i in range(40):
-		await process_frame
-	game._end_resist()
-	await _frames(4)
-	print("R 计时归零: 压力 %.1f → %.1f (应 +20)" % [p0, game.pressure])
-	print("R 句子失败音播放 = ", _playing("sentence_fail"))
+	await _frames(6)
+	print("R 按住 0.5s 后松手: resisting=", game.resisting,
+		" 麻木 ", snappedf(n1, 0.1), "→", snappedf(game.numbness, 0.1), "（应不变）")
 
 	# ---------- 误触 ----------
 	print("\nR === 误触 ===")
 	if game.phase == "story":
-		ov.finish_now()
-		await _frames(6)
+		await _skip_all_story()
 	sfx.stop_all()
 	game.input_box.text = "错"
 	game.input_box.text_changed.emit("错")
@@ -78,8 +75,7 @@ func _initialize() -> void:
 	# ---------- 游戏失败 ----------
 	print("\nR === 游戏失败 ===")
 	if game.phase == "story":
-		ov.finish_now()
-		await _frames(6)
+		await _skip_all_story()
 	sfx.stop_all()
 	game.pressure = 100.0
 	game._update_bars()

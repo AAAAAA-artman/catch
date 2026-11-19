@@ -64,8 +64,10 @@ var kind_deck: Array[String] = []
 var _used_texts := {}
 ## 当前连续同类型句数
 var _kind_run := 0
-## 上一句的类型
+## 上一句的类型（池名）
 var _last_kind := ""
+## 上一句的档位 1~5
+var _last_tier := 3
 
 @onready var title_label: Label = %TitleLabel
 @onready var state_label: Label = %StateLabel
@@ -141,13 +143,27 @@ const SENTENCE_FADE_OUT := 0.7
 var curved_arc_defer := 0.0
 
 # ---- 抵抗（Alt）：不再直接跳句，而是把这句话的计时快速推到底 ----
-## 抵抗时计时推进的倍率（正常 1 秒 = 抵抗时 8 秒）
-const RESIST_TIME_SCALE := 8.0
-## 抵抗时累计多久算"浪费"一点压力（秒，真实时间）
-const RESIST_PRESSURE_TICK := 0.45
-## 每次 tick 增加的压力
-const RESIST_PRESSURE_PER_TICK := 3.0
+## ---- 抵抗（Alt）新规则 ----
+## 按住固定 2.5 秒，这句话被跳过
+const RESIST_HOLD_TIME := 2.5
+## 每抵抗一句：麻木固定 +14
+const RESIST_NUMBNESS := 14.0
+## 每抵抗一句：好感 -3（不加压力）
+const RESIST_AFFECTION_LOSS := 3.0
+
+## ---- 句子五档（1 = 最坏，5 = 最好）----
+## 每档对压力 / 好感的影响
+const TIER_PRESSURE := {1: 12.0, 2: 8.0, 3: 1.0, 4: -8.0, 5: -14.0}
+const TIER_AFFECTION_BONUS := {1: 0.75, 2: 0.90, 3: 1.00, 4: 1.10, 5: 1.25}
+## 抽取权重（中性最多，两端最少）
+const TIER_WEIGHT := {1: 1.2, 2: 2.4, 3: 5.0, 4: 2.4, 5: 1.2}
+## 连续同侧上限：坏（1/2）最多 2 次，好（4/5）与中性最多 4 次
+const TIER_MAX_RUN := {1: 2, 2: 2, 3: 4, 4: 4, 5: 4}
 var resisting := false
+## 抵抗剩余时间（秒）
+var resist_hold_left := 0.0
+## 当前句的档位 1~5
+var current_tier := 3
 
 # 开发者模式：免死（压力/麻木不会导致失败）
 var debug_invincible := false
@@ -227,9 +243,8 @@ func _process(delta: float) -> void:
 			state_label.text = "可以继续输入"
 	phrase_elapsed += delta
 	if resisting:
-		# 抵抗：把这句的计时器快速推到终点，而不是直接判定跳过
+		# 抵抗：独立的固定 2.5 秒计时，不消耗本句时间
 		_tick_resist(delta)
-		time_left = maxf(0.0, time_left - delta * RESIST_TIME_SCALE)
 	else:
 		time_left = maxf(0.0, time_left - delta)
 	# 左竖条显示"剩余时间"，所以是反向
@@ -455,21 +470,23 @@ func _advance_sentence(message: String) -> void:
 	# 阶段开头的固定句优先（按顺序播）
 	var entry: Dictionary = _opener_entry(round_number)
 	if not entry.is_empty():
-		current_kind = "neutral"
-		if current_kind == _last_kind:
-			_kind_run += 1
-		else:
-			_kind_run = 1
-			_last_kind = current_kind
+		current_tier = int(entry.get("tier", 3))
+		current_kind = _tier_kind(current_tier)
+		_kind_run = 1
+		_last_tier = current_tier
+		_last_kind = current_kind
 	else:
 		# 闪现触发后，接下来几句改成从"偷听到的"好句子池抽
 		if _is_special_sentence():
 			entry = _draw_overheard()
 			if not entry.is_empty():
+				current_tier = 5
 				current_kind = "positive"
 		if entry.is_empty() or not entry.has("text"):
-			current_kind = _pick_next_kind()
-			entry = _draw_sentence(current_kind)
+			current_tier = _pick_next_tier()
+			current_kind = _tier_kind(current_tier)
+			entry = _draw_sentence(current_kind, current_tier)
+			current_tier = int(entry.get("tier", current_tier))
 	current_sentence = entry["text"]
 	current_pinyin = PackedStringArray(entry["pinyin"])
 	current_speaker = String(entry.get("speaker", ""))
@@ -533,115 +550,7 @@ func _advance_sentence(message: String) -> void:
 
 ## 每个阶段 10 句的句子类型牌堆。
 ## 越往后负面句越多（压力感递增），但每阶段都保证有正面句，不至于一路挨骂。
-## 重置抽取状态（开局调用）
-func _reset_draw_state() -> void:
-	_used_texts.clear()
-	_kind_run = 0
-	_last_kind = ""
-
-
-func _used_key(phase: String, kind: String) -> String:
-	return phase + ":" + kind
-
-
-## 某阶段某类型里还没被抽过的句子
-func _remaining_pool(phase: String, kind: String) -> Array:
-	var all: Array = SentenceData.pool(phase, kind)
-	if all.is_empty():
-		return []
-	var used: Array = _used_texts.get(_used_key(phase, kind), [])
-	var out: Array = []
-	for e in all:
-		if not used.has(String(e["text"])):
-			out.append(e)
-	return out
-
-
-## 按权重选下一句的类型。
-##   · 连续抽到同一类型时，其他类型的权重逐步提高（最多压到 0.12 / 抬到约 2.5 倍）
-##   · 硬上限：坏句最多连续 2 次（可能致死），其余最多 4 次
-func _pick_next_kind() -> String:
-	var kinds: Array[String] = ["neutral", "positive", "negative"]
-	var phase := _sentence_phase()
-	var remain := {}
-	var total_left := 0
-	for k in kinds:
-		var n := _remaining_pool(phase, k).size()
-		if n == 0:
-			# 该池抽完了 → 清掉已用记录，允许重新抽
-			_used_texts.erase(_used_key(phase, k))
-			n = SentenceData.pool(phase, k).size()
-		remain[k] = n
-		total_left += n
-	if total_left <= 0:
-		return "neutral"
-
-	var w := {"neutral": 5.0, "positive": 2.5, "negative": 2.5}
-	if _last_kind != "" and _kind_run >= 1:
-		var run_f := float(_kind_run)
-		for k in kinds:
-			if k == _last_kind:
-				w[k] *= maxf(0.12, 1.0 - 0.35 * run_f)
-			else:
-				w[k] *= 1.0 + 0.50 * run_f
-
-	# 硬上限
-	if _last_kind != "":
-		var cap: int = int(MAX_RUN.get(_last_kind, 4))
-		if _kind_run >= cap:
-			w[_last_kind] = 0.0
-
-	var total := 0.0
-	for k in kinds:
-		if int(remain[k]) <= 0:
-			w[k] = 0.0
-		total += float(w[k])
-	if total <= 0.0:
-		for k in kinds:
-			if int(remain[k]) > 0:
-				return k
-		return "neutral"
-
-	var roll := rng.randf() * total
-	for k in kinds:
-		roll -= float(w[k])
-		if roll <= 0.0:
-			return k
-	return "neutral"
-
-
-## 取阶段开头的固定句（找不到就返回空字典，退回随机）
-func _opener_entry(n: int) -> Dictionary:
-	if not OPENERS.has(n):
-		return {}
-	var want: String = OPENERS[n]
-	var phase := _sentence_phase()
-	for k in ["neutral", "positive", "negative"]:
-		for e in SentenceData.pool(phase, k):
-			if String(e["text"]) == want:
-				return e
-	# 模糊：包含关系（文档标点/错字可能导致不完全一致）
-	for k in ["neutral", "positive", "negative"]:
-		for e in SentenceData.pool(phase, k):
-			var t := String(e["text"])
-			if t.contains(want) or want.contains(t):
-				return e
-	push_warning("Main: 固定开头句找不到 -> %s" % want)
-	return {}
-
-
-func _shuffle(items: Array) -> void:
-	for i in range(items.size() - 1, 0, -1):
-		var other := rng.randi_range(0, i)
-		var saved = items[i]
-		items[i] = items[other]
-		items[other] = saved
-
-
-## 当前句子池所属阶段。
-## 【重要】按句数（round_number）判定，不按好感阈值 ——
-## 和阶段画面 / 剧情触发 / 同心圆保持一致，否则会出现
-## "阶段已切换但句子池还是旧的"（好感可能因打字快慢提前或延后跨阈值）。
+## 当前句子池所属阶段（按句数判定，和阶段画面 / 剧情 / 同心圆保持一致）
 func _sentence_phase() -> String:
 	var idx := clampi((round_number - 1) / ROUNDS_PER_STAGE, 0, STAGE_COUNT - 1)
 	match idx:
@@ -654,11 +563,8 @@ func _sentence_phase() -> String:
 
 
 ## 同步输入框的显隐。
-##
-## 【关键】汉字模式的输入框**绝不能 visible=false** ——
-## 隐藏的 Control 无法持有焦点，中文输入法的组字就完全收不到，
-## 表现就是"第三阶段/终章打不了字"。
-## 所以隐藏时只把 alpha 设为 0：看不见，但仍然能输入。
+## 汉字模式的输入框不能 visible=false —— 隐藏的 Control 无法持有焦点，
+## 中文输入法收不到组字，表现就是"打不了字"。隐藏时只把 alpha 设 0。
 func _apply_input_box_visibility() -> void:
 	if input_box == null:
 		return
@@ -667,15 +573,144 @@ func _apply_input_box_visibility() -> void:
 		input_box.visible = true
 		input_box.modulate = Color(1.0, 1.0, 1.0, 1.0 if want_show else 0.0)
 	else:
-		# 拼音模式不靠输入框（自己处理按键），可以真的隐藏
 		input_box.visible = false
 		input_box.modulate = Color(1.0, 1.0, 1.0, 1.0)
 
 
-## 抽一句指定类型的句子：抽过的不会再抽到
-func _draw_sentence(kind: String) -> Dictionary:
+## 重置抽取状态（开局调用）
+func _reset_draw_state() -> void:
+	_used_texts.clear()
+	_kind_run = 0
+	_last_kind = ""
+	_last_tier = 3
+
+
+func _used_key(phase: String, kind: String) -> String:
+	return phase + ":" + kind
+
+
+## 档位 → 池名（1/2 坏，3 中，4/5 好）
+func _tier_kind(tier: int) -> String:
+	if tier <= 2:
+		return "negative"
+	if tier >= 4:
+		return "positive"
+	return "neutral"
+
+
+## 档位 → 大方向（-1 坏 / 0 中 / +1 好），用于连续上限
+func _tier_side(tier: int) -> int:
+	if tier <= 2:
+		return -1
+	if tier >= 4:
+		return 1
+	return 0
+
+
+## 某阶段某池里还没被抽过的句子；tier=0 表示不限档位
+func _remaining_pool(phase: String, kind: String, tier: int = 0) -> Array:
+	var all: Array = SentenceData.pool(phase, kind)
+	if all.is_empty():
+		return []
+	var used: Array = _used_texts.get(_used_key(phase, kind), [])
+	var out: Array = []
+	for e in all:
+		if used.has(String(e["text"])):
+			continue
+		if tier > 0 and int(e.get("tier", 3)) != tier:
+			continue
+		out.append(e)
+	return out
+
+
+## 选下一句的档位（1~5）。
+##   · 中性权重最高，两端（1/5）最低
+##   · 连续抽到同一侧时，另一侧权重提高、同侧压低
+##   · 硬上限：坏侧最多连续 2 句，中性 / 好侧最多 4 句
+func _pick_next_tier() -> int:
 	var phase := _sentence_phase()
-	var options := _remaining_pool(phase, kind)
+	var tiers: Array[int] = [1, 2, 3, 4, 5]
+	var remain := {}
+	var total_left := 0
+	for t in tiers:
+		var kind := _tier_kind(t)
+		var n := _remaining_pool(phase, kind, t).size()
+		if n == 0:
+			# 该档抽完了 → 清空整个池的已用记录，允许重抽
+			_used_texts.erase(_used_key(phase, kind))
+			n = _remaining_pool(phase, kind, t).size()
+			if n == 0:
+				n = _remaining_pool(phase, kind, 0).size()
+		remain[t] = n
+		total_left += n
+	if total_left <= 0:
+		return 3
+
+	var w := {}
+	for t in tiers:
+		w[t] = float(TIER_WEIGHT.get(t, 1.0))
+
+	if _kind_run >= 1 and _last_tier > 0:
+		var run_f := float(_kind_run)
+		for t in tiers:
+			if t == _last_tier:
+				w[t] *= maxf(0.10, 1.0 - 0.35 * run_f)
+			else:
+				w[t] *= 1.0 + 0.50 * run_f
+
+	# 硬上限：同侧连续太多就禁掉整个同侧
+	if _kind_run >= int(TIER_MAX_RUN.get(_last_tier, 4)):
+		var side := _tier_side(_last_tier)
+		for t in tiers:
+			if _tier_side(t) == side:
+				w[t] = 0.0
+
+	var total := 0.0
+	for t in tiers:
+		if int(remain[t]) <= 0:
+			w[t] = 0.0
+		total += float(w[t])
+	if total <= 0.0:
+		for t in tiers:
+			if int(remain[t]) > 0:
+				return t
+		return 3
+
+	var roll := rng.randf() * total
+	for t in tiers:
+		roll -= float(w[t])
+		if roll <= 0.0:
+			return t
+	return 3
+
+
+## 取阶段开头的固定句（找不到就返回空字典，退回随机）
+func _opener_entry(n: int) -> Dictionary:
+	if not OPENERS.has(n):
+		return {}
+	var want: String = OPENERS[n]
+	var phase := _sentence_phase()
+	for k in ["neutral", "positive", "negative"]:
+		for e in SentenceData.pool(phase, k):
+			if String(e["text"]) == want:
+				return e
+	for k in ["neutral", "positive", "negative"]:
+		for e in SentenceData.pool(phase, k):
+			var t := String(e["text"])
+			if t.contains(want) or want.contains(t):
+				return e
+	push_warning("Main: 固定开头句找不到 -> %s" % want)
+	return {}
+
+
+## 抽一句：抽过的不会再抽到。tier>0 时优先在该档内抽。
+func _draw_sentence(kind: String, tier: int = 0) -> Dictionary:
+	var phase := _sentence_phase()
+	var options: Array = []
+	if tier > 0:
+		options = _remaining_pool(phase, kind, tier)
+	if options.is_empty():
+		options = _remaining_pool(phase, kind, 0)
 	if options.is_empty():
 		_used_texts.erase(_used_key(phase, kind))
 		options = SentenceData.pool(phase, kind).duplicate()
@@ -683,7 +718,7 @@ func _draw_sentence(kind: String) -> Dictionary:
 		options = SentenceData.pool("phase1", kind).duplicate()
 	if options.is_empty():
 		return {}
-	# 避免和上一句完全相同
+
 	if options.size() > 1:
 		var filtered: Array = []
 		for e in options:
@@ -697,12 +732,13 @@ func _draw_sentence(kind: String) -> Dictionary:
 	used.append(String(pick["text"]))
 	_used_texts[_used_key(phase, kind)] = used
 
-	# 记录连续同类型
-	if kind == _last_kind:
+	var picked_tier := int(pick.get("tier", 3))
+	if picked_tier == _last_tier:
 		_kind_run += 1
 	else:
 		_kind_run = 1
-		_last_kind = kind
+		_last_tier = picked_tier
+	_last_kind = _tier_kind(picked_tier)
 	return pick
 
 
@@ -985,18 +1021,16 @@ func _complete_sentence() -> void:
 	score += gained
 	var message := "接住了。+%d 分，速度 %.0f 字符/分" % [gained, speed]
 	var affection_gain := _affection_from_performance(speed)
-	match current_kind:
-		"neutral":
-			affection = minf(MAX_VALUE, affection + affection_gain)
-			pressure = minf(MAX_VALUE, pressure + 5.0)
-		"positive":
-			affection = minf(MAX_VALUE, affection + affection_gain)
-			pressure = maxf(0.0, pressure - 12.0)
-		"negative":
-			affection = minf(MAX_VALUE, affection + affection_gain)
-			pressure = minf(MAX_VALUE, pressure + 18.0)
-			# 负面句：眼前涌上泪水
-			_play_tears()
+	affection = minf(MAX_VALUE, affection + affection_gain)
+	# 压力按「五档」变化：坏句加压、好句减压
+	var dp: float = float(TIER_PRESSURE.get(current_tier, 4.0))
+	if dp >= 0.0:
+		pressure = minf(MAX_VALUE, pressure + dp)
+	else:
+		pressure = maxf(0.0, pressure + dp)
+	# 明显负面（1/2 档）才涌上泪水
+	if current_tier <= 2:
+		_play_tears()
 	_fade_out_curved_sentence()
 	_update_bars()
 	_save_records()
@@ -1044,8 +1078,8 @@ func _affection_from_performance(speed: float) -> int:
 	var reference: float = REFERENCE_CPM[input_mode]
 	var skill := clampf(speed / maxf(reference, 1.0), 0.75, 1.25)
 	var penalty := 1.0 / (1.0 + 0.25 * float(phrase_mistakes))
-	# 句子类型只做轻微加权：负面句稍微更"伤"，正面句稍缓和
-	var kind_bonus: float = {"neutral": 1.0, "positive": 0.92, "negative": 1.10}.get(current_kind, 1.0)
+	# 档位加权：越好的句子涨得越多，越坏的越少
+	var kind_bonus: float = float(TIER_AFFECTION_BONUS.get(current_tier, 1.0))
 	var gain := base * skill * penalty * kind_bonus
 	# 夹住单句涨幅，避免一次暴涨或几乎不涨
 	gain = clampf(gain, base * 0.5, base * 1.8)
@@ -1568,6 +1602,7 @@ func _advance_final_sentence(message: String) -> void:
 	current_pinyin = PackedStringArray(entry["pinyin"])
 	current_speaker = String(entry.get("speaker", ""))
 	current_voice_len = String(entry.get("len", ""))
+	current_tier = int(entry.get("tier", 3))
 	current_target = current_sentence if input_mode == "hanzi" else " ".join(current_pinyin)
 	last_sentence = current_sentence
 	# 不计时：给一个很大的值，UI 也已隐藏
@@ -1707,33 +1742,45 @@ func _begin_resist() -> void:
 	if phase != "playing" or resisting:
 		return
 	resisting = true
-	_state_resist_tick = 0.0
+	resist_hold_left = RESIST_HOLD_TIME
 	if sfx_player != null:
 		sfx_player.start_resist()
-	state_label.text = "正在抵抗 · 这句话飞速滑过，松手可停"
+	state_label.text = "正在抵抗… %.1f 秒" % RESIST_HOLD_TIME
 
 
 func _end_resist() -> void:
 	if not resisting:
 		return
 	resisting = false
-	_state_resist_tick = 0.0
+	resist_hold_left = 0.0
 	if sfx_player != null:
 		sfx_player.stop_resist()
 	if phase == "playing":
 		state_label.text = "正在对话"
 
 
-var _state_resist_tick := 0.0
-
-
-## 抵抗期间按真实时间累积压力（麻木条上涨），表示"硬扛的代价"。
+## 抵抗计时：按住满 2.5 秒就跳掉这句
 func _tick_resist(delta: float) -> void:
-	_state_resist_tick += delta
-	if _state_resist_tick >= RESIST_PRESSURE_TICK:
-		_state_resist_tick -= RESIST_PRESSURE_TICK
-		numbness = minf(MAX_VALUE, numbness + RESIST_PRESSURE_PER_TICK)
-		_update_bars()
+	resist_hold_left = maxf(0.0, resist_hold_left - delta)
+	state_label.text = "正在抵抗… %.1f 秒" % resist_hold_left
+	if resist_hold_left <= 0.0:
+		_finish_resist_sentence()
+
+
+## 抵抗成功跳句：麻木固定 +，好感 -，压力不变
+func _finish_resist_sentence() -> void:
+	if not resisting:
+		return
+	_end_resist()
+	numbness = minf(MAX_VALUE, numbness + RESIST_NUMBNESS)
+	affection = maxf(0.0, affection - RESIST_AFFECTION_LOSS)
+	_update_bars()
+	_fade_out_curved_sentence()
+	if sfx_player != null:
+		sfx_player.play_sentence_fail()
+	if _check_loss():
+		return
+	_advance_sentence("你避开了这句话。麻木 +%d，好感 -%d" % [int(RESIST_NUMBNESS), int(RESIST_AFFECTION_LOSS)])
 
 
 # ============================================================ 紧张音
