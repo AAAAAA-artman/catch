@@ -1805,6 +1805,10 @@ func _spawn_curved_sentence(body: String, tone: String) -> void:
 		return
 	_clear_curved_text()
 	var settings := _curved_tone(tone)
+	# 一二阶段飘字：统一用主界面「接住」的暖白纯色（不再走灰绿渐变）
+	if _sentence_phase() != "phase3":
+		settings["color_start"] = Color("f7f2e6")
+		settings["color_end"] = Color("f7f2e6")
 	var plan := _plan_curved_lines(body)
 	var font_size: int = plan["font_size"]
 	var lines: PackedStringArray = plan["lines"]
@@ -1835,34 +1839,12 @@ func _spawn_curved_sentence(body: String, tone: String) -> void:
 	# 第三阶段面板会移到屏幕中央，飘字上移避免重叠
 	if _sentence_phase() == "phase3" and _dialog_hidden_p3:
 		center_y = stage_size.y * 0.14
-	var use_gradient: bool = phase_name != "phase3"
 	for i in lines.size():
 		var y := center_y + (float(i) - float(lines.size() - 1) * 0.5) * line_gap
 		var anchor := Vector2(stage_size.x * 0.5, y)
 		var node := TextFX.spawn(text_fx_root, lines[i], anchor, "reveal", settings)
 		if node != null:
-			if use_gradient:
-				_apply_arc_gradient(node, anchor, float(font_size))
 			_curved_sentence_nodes.append(node)
-
-
-## 给飘字套上「封面那种」上实下虚的渐变
-func _apply_arc_gradient(node: Node, anchor: Vector2, font_size: float) -> void:
-	if node == null or not (node is CanvasItem):
-		return
-	var shader_res := load("res://shaders/arc_text_gradient.gdshader")
-	if shader_res == null:
-		return
-	var mat := ShaderMaterial.new()
-	mat.shader = shader_res
-	# 渐变带：以文字所在高度为中心，上下各撑 1.1 个字高（换算成 0~1 屏幕坐标）
-	var vp := get_viewport_rect().size
-	# anchor 是 Stage/TextFx 的本地坐标，转成屏幕坐标
-	var world := text_fx_root.get_global_transform() * anchor
-	var half := font_size * 1.5
-	mat.set_shader_parameter("band_top", clampf((world.y - half) / vp.y, 0.0, 1.0))
-	mat.set_shader_parameter("band_bottom", clampf((world.y + half) / vp.y, 0.0, 1.0))
-	(node as CanvasItem).material = mat
 
 
 ## 把当前飘在画面上的句子淡出（打完 / 超时 / 进剧情时调用）
