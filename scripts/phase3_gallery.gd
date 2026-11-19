@@ -161,6 +161,37 @@ func expand_to_full() -> void:
 		Color(FULL_DIM, FULL_DIM, FULL_DIM, 1.0), EXPAND_TIME)
 
 
+## 直接换一张图（终章配图用），带淡入
+func show_image(path: String, fade: float = 0.85) -> void:
+	if _cover == null or not _active:
+		return
+	if not ResourceLoader.exists(path):
+		return
+	var tex: Texture2D = load(path)
+	if tex == null:
+		return
+	if _cover.texture == tex:
+		return
+	# 先铺到 _swap，再交叉淡入
+	var vp := get_viewport_rect().size
+	_swap.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_apply_rect(_swap, Rect2(Vector2.ZERO, vp))
+	_swap.texture = tex
+	_swap.modulate = Color(FULL_DIM, FULL_DIM, FULL_DIM, 0.0)
+	if _fade_tween != null and _fade_tween.is_valid():
+		_fade_tween.kill()
+	_fade_tween = create_tween()
+	_fade_tween.tween_property(_swap, "modulate", Color(FULL_DIM, FULL_DIM, FULL_DIM, 1.0), fade)
+	_fade_tween.tween_callback(func() -> void:
+		if not is_instance_valid(_cover) or not is_instance_valid(_swap):
+			return
+		_cover.texture = _swap.texture
+		_cover.modulate = Color(FULL_DIM, FULL_DIM, FULL_DIM, 1.0)
+		_swap.modulate.a = 0.0
+		_swap.texture = null
+	)
+
+
 func is_expanded() -> bool:
 	return _expanded
 

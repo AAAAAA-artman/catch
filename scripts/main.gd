@@ -161,6 +161,14 @@ const P3_TEARS_STEP := 0.135
 ##   第一段：1「你什么时候回来的」→ 2「房门别关上啊」
 ##   第二段：11「不要把门关上」→ 12「一进屋就看见你房间关着个门难看死了」
 ##   第三段：21「门开着吧要不都看不见你」
+## 终章 5 句的配图：每打完一句换下一张，没下一张就停在最后一张
+const FINAL_IMAGES := [
+	"res://art/story/fin_1.jpg",
+	"res://art/story/fin_2.jpg",
+	"res://art/story/fin_3.jpg",
+	"res://art/story/fin_4.jpg",
+]
+
 const OPENERS := {
 	1: "你什么时候回来的",
 	2: "房门别关上啊",
@@ -398,6 +406,7 @@ func _start_game(mode: String) -> void:
 	_final_done = 0
 	_final_played = false
 	_final_finishing = false
+	_final_image_index = -1
 	_set_final_hud(false)
 	if tears_fx != null:
 		tears_fx.hide_now()
@@ -486,7 +495,7 @@ func _advance_sentence(message: String) -> void:
 	_last_input_length = 0  # 换句/进剧情时同步重置击键计数
 	input_box.editable = input_mode == "hanzi"
 	# 第三阶段（面板已移到中央）不要输入框
-	input_box.visible = input_mode == "hanzi" and not _dialog_hidden_p3
+	_apply_input_box_visibility()
 	if input_mode == "hanzi":
 		input_box.call_deferred("grab_focus")
 	else:
@@ -642,6 +651,25 @@ func _sentence_phase() -> String:
 			return "phase2"
 		_:
 			return "phase3"
+
+
+## 同步输入框的显隐。
+##
+## 【关键】汉字模式的输入框**绝不能 visible=false** ——
+## 隐藏的 Control 无法持有焦点，中文输入法的组字就完全收不到，
+## 表现就是"第三阶段/终章打不了字"。
+## 所以隐藏时只把 alpha 设为 0：看不见，但仍然能输入。
+func _apply_input_box_visibility() -> void:
+	if input_box == null:
+		return
+	var want_show: bool = (input_mode == "hanzi") and (not _dialog_hidden_p3)
+	if input_mode == "hanzi":
+		input_box.visible = true
+		input_box.modulate = Color(1.0, 1.0, 1.0, 1.0 if want_show else 0.0)
+	else:
+		# 拼音模式不靠输入框（自己处理按键），可以真的隐藏
+		input_box.visible = false
+		input_box.modulate = Color(1.0, 1.0, 1.0, 1.0)
 
 
 ## 抽一句指定类型的句子：抽过的不会再抽到
@@ -1479,6 +1507,8 @@ var _cell_tween: Tween = null
 func _start_final_phase() -> void:
 	phase = "final"
 	_final_played = true
+	# 清掉上一句还没淡完的飘字，避免终章画面残留
+	_clear_curved_text()
 	_final_queue = SentenceData.pool("final", "positive").duplicate()
 	_final_done = 0
 	_set_final_hud(true)
@@ -1500,6 +1530,9 @@ func _start_final_phase() -> void:
 		_promote_dialog_center(true)
 	if p3_tears != null:
 		p3_tears.set_level(1.0, 3.8, 2.2)
+	# 终章配图从第一张开始
+	_final_image_index = -1
+	_advance_final_image()
 	_advance_final_sentence("")
 
 
@@ -1511,6 +1544,17 @@ func _set_final_hud(hide_them: bool) -> void:
 			get_node_or_null("NumbnessCaption")]:
 		if node != null:
 			node.visible = not hide_them
+
+
+## 终章换下一张配图（没有下一张就停在当前，不重复）
+func _advance_final_image() -> void:
+	if phase3_gallery == null or not phase3_gallery.has_method("show_image"):
+		return
+	var next_index := _final_image_index + 1
+	if next_index >= FINAL_IMAGES.size():
+		return   # 图片用完了，停在最后一张
+	_final_image_index = next_index
+	phase3_gallery.show_image(FINAL_IMAGES[next_index], 0.85)
 
 
 func _advance_final_sentence(message: String) -> void:
@@ -1543,7 +1587,7 @@ func _advance_final_sentence(message: String) -> void:
 	input_box.text = ""
 	_last_input_length = 0
 	input_box.editable = input_mode == "hanzi"
-	input_box.visible = input_mode == "hanzi" and not _dialog_hidden_p3
+	_apply_input_box_visibility()
 	if input_mode == "hanzi":
 		input_box.call_deferred("grab_focus")
 	else:
@@ -1580,6 +1624,7 @@ func _complete_final_sentence() -> void:
 		_play_story(STORY_EPILOGUE)
 		return
 	_show_feedback("接住了。", Color("f7d292"))
+	_advance_final_image()
 	_advance_final_sentence("")
 
 
@@ -1619,6 +1664,8 @@ var _p3_tears_level := 0.0
 ## 终章（好感满后的独立句子池）剩余句子
 var _final_queue: Array = []
 var _final_done := 0
+## 终章配图当前显示到第几张
+var _final_image_index := -1
 ## 终章是否已经打过（决定 epilogue 的时机）
 var _final_played := false
 ## 终章收尾是否已经开始（防重复触发）
@@ -2184,6 +2231,7 @@ func _promote_dialog_center(promote: bool) -> void:
 	# 第三阶段把黑底面板换成完全透明的样式，字直接浮在照片上
 	if promote:
 		panel.add_theme_stylebox_override("panel", _make_transparent_panel_style())
+		_apply_input_box_visibility()
 		if state_label != null:
 			state_label.visible = false
 	elif _dialog_home_style != null:
@@ -2203,8 +2251,7 @@ func _promote_dialog_center(promote: bool) -> void:
 		target = Rect2(Vector2((vp.x - w) * 0.5, (vp.y - h) * 0.5), Vector2(w, h))
 	else:
 		target = _dialog_home_rect
-		if input_box != null:
-			input_box.visible = input_mode == "hanzi"
+		_apply_input_box_visibility()
 
 	_dialog_swing_tween = create_tween()
 	_dialog_swing_tween.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_CUBIC)
@@ -2216,8 +2263,7 @@ func _promote_dialog_center(promote: bool) -> void:
 	# 宽度变了 → 字格必须按新宽度重排
 	_dialog_swing_tween.chain().tween_callback(_rebuild_cells_for_width)
 	# 第三阶段不要输入框：输入靠字格反馈
-	if input_box != null:
-		input_box.visible = false
+	_apply_input_box_visibility()
 
 
 ## 面板尺寸变化后，按新宽度重建字格（字号/折行都会变）
@@ -2308,8 +2354,7 @@ func _fit_panel_height_to_content() -> void:
 	var panel: Control = %SentencePanel
 	if panel == null:
 		return
-	if input_box != null:
-		input_box.visible = false   # 不参与测量
+	_apply_input_box_visibility()   # 不参与测量
 
 	# 用内容实际高度度量（get_combined_minimum_size 在刚重建字格时可能还没刷新）
 	var need: float = _measure_panel_content_height(panel)
