@@ -96,12 +96,13 @@ var feedback_tween: Tween
 # ---- 剧情流程 ----
 # 五段剧情的统一叫法与 BGM 对应：
 #   prologue   回家路上→进门→睡着        Circulation
-#   act1_intro 梦中醒来（变小、被声音淹没） Dream Street
+#   act1_intro 过渡文本一（梦中醒来，变小、被声音淹没）Dream Street
 #   act1_end   第一段游戏后的剧情         There's Something Outside
 #   act2_end   第二段游戏后的剧情         萍逢
 #   epilogue   第三段→结局                萍逢
-# 触发点：开局 prologue；第一段游戏结束 act1_intro→act1_end；
-#         第二段游戏结束 act2_end；第三段游戏结束 epilogue。
+# 触发点：开局 prologue → act1_intro（**都在第一段游戏开始之前**）；
+#         第一段游戏结束 act1_end；第二段游戏结束 act2_end；
+#         第三段游戏结束 epilogue。
 const STORY_PROLOGUE := "prologue"
 const STORY_ACT1_INTRO := "act1_intro"
 const STORY_ACT1_END := "act1_end"
@@ -1114,9 +1115,9 @@ func _spawn_curved_banner(body: String, tone: String, hold: float = 5.5) -> void
 ## 三段游戏各自的"结束标记"是 act1_end / act2_end / epilogue，
 ## 中间过场 intro 段的 act1_intro 与 act1_end 连着播。
 func _next_story_id() -> String:
-	# 第一段游戏打完 → 先 act1_intro，再 act1_end
-	if not story_seen.has(STORY_ACT1_INTRO) and affection >= STORY_MID_1:
-		return STORY_ACT1_INTRO
+	# 注意：act1_intro（过渡文本一）**不在**这里按好感度触发 ——
+	# 它在开局 prologue 之后立刻播完，然后才是第一段游戏。
+	# 这里只留第一段游戏之后的 act1_end。
 	if not story_seen.has(STORY_ACT1_END) and affection >= STORY_MID_1:
 		return STORY_ACT1_END
 	# 第二段游戏打完 → act2_end
@@ -1181,6 +1182,14 @@ func _start_story_chain(message: String) -> bool:
 
 func _on_story_finished(_segment_id: String) -> void:
 	story_overlay.hide()
+
+	# 开场 prologue 演完 → 先接「过渡文本一」（act1_intro），
+	# 播完才真正开始第一段游戏的输入。
+	if story_resume == "start" and not story_seen.has(STORY_ACT1_INTRO):
+		story_resume = "start"
+		_play_story(STORY_ACT1_INTRO)
+		return
+
 	# 一次跨过多个阈值时，把该播的剧情连续播完
 	# （epilogue 播完时 story_seen 已含 epilogue，_next_story_id 会返回空）
 	if story_resume != "ending" and _start_story_chain(pending_message):
