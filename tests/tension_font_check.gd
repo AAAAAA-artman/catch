@@ -27,8 +27,7 @@ func _initialize() -> void:
 
 	game._start_game("hanzi")
 	await _frames(4)
-	ov.finish_now()
-	await _frames(8)
+	await _skip_all_story()
 
 	# ---- 紧张音：剩余时间变化 ----
 	print("\nT === 紧张音 ===")
@@ -80,8 +79,7 @@ func _initialize() -> void:
 	print("\nT === 字体截图 ===")
 	game._start_game("hanzi")
 	await _frames(4)
-	ov.finish_now()
-	await _frames(20)
+	await _skip_all_story()
 	root.get_texture().get_image().save_png(OUT + "font_hanzi.png")
 	print("T 截图 font_hanzi.png 当前句=", game.current_sentence)
 
@@ -99,3 +97,14 @@ func _playing(name: String) -> bool:
 func _frames(n: int) -> void:
 	for i in range(n):
 		await process_frame
+
+## 连续跳过所有排队剧情，直到真正进入 playing
+func _skip_all_story() -> void:
+	var ov: Control = game.get_node("StoryOverlay")
+	for guard in range(8):
+		if game.phase != "story":
+			return
+		ov.finish_now()
+		game.skip_voice_wait()
+		for i in range(10):
+			await process_frame

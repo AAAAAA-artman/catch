@@ -21,8 +21,7 @@ func _initialize() -> void:
 
 	game._start_game("hanzi")
 	await _frames(4)
-	ov.finish_now()
-	game.skip_voice_wait()
+	await _skip_all_story()
 	await _frames(8)
 	print("SFX 开局完成, 当前句 = ", game.current_sentence, " 类型 = ", game.current_kind)
 
@@ -121,3 +120,14 @@ func _find_playing(name: String) -> bool:
 func _frames(n: int) -> void:
 	for i in range(n):
 		await process_frame
+
+## 连续跳过所有排队剧情，直到真正进入 playing
+func _skip_all_story() -> void:
+	var ov: Control = game.get_node("StoryOverlay")
+	for guard in range(8):
+		if game.phase != "story":
+			return
+		ov.finish_now()
+		game.skip_voice_wait()
+		for i in range(10):
+			await process_frame
