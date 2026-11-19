@@ -303,7 +303,7 @@ func _input(event: InputEvent) -> void:
 			_close_pause_settings()
 			accept_event()
 			return
-		if phase == "playing":
+		if phase == "playing" or phase == "final":
 			_pause_game()
 			accept_event()
 		elif phase == "paused":
@@ -324,7 +324,7 @@ func _input(event: InputEvent) -> void:
 	elif phase == "playing" and key.keycode == KEY_ALT:
 		_begin_resist()
 		accept_event()
-	elif phase == "playing" and input_mode == "pinyin":
+	elif (phase == "playing" or phase == "final") and input_mode == "pinyin":
 		_handle_pinyin_key(key)
 
 
@@ -698,8 +698,9 @@ func _build_pause_menu() -> void:
 
 
 func _pause_game() -> void:
-	if phase != "playing":
+	if phase != "playing" and phase != "final":
 		return
+	_paused_from = phase
 	phase = "paused"
 	if resisting:
 		_end_resist()
@@ -714,7 +715,7 @@ func _resume_game() -> void:
 	if _pause_settings_open:
 		_close_pause_settings()
 		return
-	phase = "playing"
+	phase = _paused_from if _paused_from != "" else "playing"
 	pause_overlay.hide()
 	input_box.editable = input_mode == "hanzi" and input_lock_left <= 0.0 and not voice_waiting
 	state_label.text = "正在对话"
@@ -1387,7 +1388,7 @@ func _layout_sentence() -> void:
 
 
 func _place_cursor_after_layout() -> void:
-	if phase == "playing":
+	if phase == "playing" or phase == "final":
 		_layout_sentence()
 		if has_started_typing:
 			_move_cursor(input_box.text.length(), false)
@@ -2053,6 +2054,8 @@ var _last_input_length := 0
 var main_menu: Control = null
 ## 暂停菜单里是否开着设置浮层
 var _pause_settings_open := false
+## 暂停前处于哪个 phase（playing / final），恢复时要用
+var _paused_from := "playing"
 ## 游戏内的操作说明浮层
 var _tutorial_layer: Control = null
 ## Ending 画面（半透明黑底 + 白字上飘）

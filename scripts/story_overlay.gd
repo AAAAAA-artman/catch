@@ -347,14 +347,14 @@ func _build_ui() -> void:
 	_panel.anchor_right = 1.0
 	_panel.anchor_bottom = 1.0
 	_panel.offset_left = 78.0
-	_panel.offset_top = -248.0
+	_panel.offset_top = -212.0
 	_panel.offset_right = -78.0
-	_panel.offset_bottom = -54.0
+	_panel.offset_bottom = -22.0
 	_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.035, 0.038, 0.055, 0.88)
-	style.border_color = Color(0.30, 0.28, 0.34, 0.75)
+	style.bg_color = Color(0.035, 0.038, 0.055, 0.55)
+	style.border_color = Color(0.55, 0.52, 0.60, 0.45)
 	style.set_border_width_all(1)
 	style.set_corner_radius_all(10)
 	style.content_margin_left = 30.0

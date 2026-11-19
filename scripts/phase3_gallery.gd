@@ -217,6 +217,11 @@ func is_expanded() -> bool:
 
 func reset() -> void:
 	_kill_tweens()
+	# snap_full 之后 visible / _root.visible 可能是 true，必须一起关掉
+	_active = false
+	visible = false
+	if _root != null:
+		_root.visible = false
 	_progress = 0.0
 	_index = -1
 	_intro = false
