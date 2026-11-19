@@ -94,16 +94,18 @@ func _tex(i: int) -> Texture2D:
 
 func set_active(on: bool) -> void:
 	_active = on
+	# 进入第三阶段时**不显示任何东西** —— 第一句要保持原布局
+	# 图片只在第一句打完后（expand_to_full）才开始交替
 	if _root != null:
-		_root.visible = on
+		_root.visible = false
 	visible = on
 	if on:
-		_intro = true
+		_intro = false
 		_intro_timer = 0.0
 		_intro_show_b = false
 		_expanded = false
 		_index = -1
-		_show_intro_pair()
+		# 不清 texture，等 expand 时再填
 	else:
 		_kill_tweens()
 		_intro = false
@@ -132,8 +134,11 @@ func expand_to_full() -> void:
 	if _expanded or not _active:
 		return
 	_expanded = true
-	_intro = false
 	_kill_tweens()
+
+	# 先把小框交替打开（第一句期间它是隐藏的）
+	if _root != null:
+		_root.visible = true
 
 	_swap.modulate.a = 0.0
 	_swap.texture = null

@@ -427,7 +427,8 @@ func _advance_sentence(message: String) -> void:
 	input_box.text = ""
 	_last_input_length = 0  # 换句/进剧情时同步重置击键计数
 	input_box.editable = input_mode == "hanzi"
-	input_box.visible = input_mode == "hanzi"
+	# 第三阶段（面板已移到中央）不要输入框
+	input_box.visible = input_mode == "hanzi" and not _dialog_hidden_p3
 	if input_mode == "hanzi":
 		input_box.call_deferred("grab_focus")
 	else:
@@ -1782,6 +1783,8 @@ func _promote_dialog_center(promote: bool) -> void:
 		target = Rect2(Vector2((vp.x - w) * 0.5, (vp.y - h) * 0.5), Vector2(w, h))
 	else:
 		target = _dialog_home_rect
+		if input_box != null:
+			input_box.visible = input_mode == "hanzi"
 
 	_dialog_swing_tween = create_tween()
 	_dialog_swing_tween.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_CUBIC)
@@ -1792,6 +1795,9 @@ func _promote_dialog_center(promote: bool) -> void:
 	_dialog_swing_tween.tween_property(panel, "offset_bottom", target.position.y + target.size.y, 1.1)
 	# 宽度变了 → 字格必须按新宽度重排
 	_dialog_swing_tween.chain().tween_callback(_rebuild_cells_for_width)
+	# 第三阶段不要输入框：输入靠字格反馈
+	if input_box != null:
+		input_box.visible = false
 
 
 ## 面板尺寸变化后，按新宽度重建字格（字号/折行都会变）
@@ -1804,6 +1810,9 @@ func _rebuild_cells_for_width() -> void:
 		_build_hanzi_cells()
 	_layout_sentence()
 	_update_typing_progress(input_box.text if input_box != null else "")
+	# 隐藏输入框后，面板高度要贴合内容（否则下方留一片空白）
+	if _dialog_hidden_p3:
+		call_deferred("_fit_panel_height_to_content")
 
 
 ## 瞬时把对话框设到「中央」状态（换句复位后立即推回去）
@@ -1829,3 +1838,19 @@ func _apply_dialog_hidden_instant() -> void:
 	call_deferred("_rebuild_cells_for_width")
 
 
+## 面板高度贴合内容（第三阶段隐藏输入框后用）
+func _fit_panel_height_to_content() -> void:
+	if not _dialog_hidden_p3:
+		return
+	var panel: Control = %SentencePanel
+	if panel == null:
+		return
+	var need: float = panel.get_combined_minimum_size().y + 8.0
+	var cur: float = panel.offset_bottom - panel.offset_top
+	if absf(need - cur) < 4.0:
+		return
+	var vp := get_viewport_rect().size
+	var new_h: float = clampf(need, 120.0, vp.y * 0.55)
+	var cy: float = (panel.offset_top + panel.offset_bottom) * 0.5
+	panel.offset_top = cy - new_h * 0.5
+	panel.offset_bottom = cy + new_h * 0.5
