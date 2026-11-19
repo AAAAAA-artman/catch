@@ -1,0 +1,23 @@
+# Godot 4 编辑器缓存与导入产物
+.godot/
+*.translation
+
+# 导出产物
+exports/
+build/
+*.exe
+*.pck
+*.zip
+
+# 系统 / 编辑器杂项
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
+*.bak_*
+_dbg_*
+*/_dbg_*
+
+# Python 脚本产物（本仓库不含，仅防误提交）
+__pycache__/
+*.pyc

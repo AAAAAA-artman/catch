@@ -1,0 +1,244 @@
+class_name VoiceData
+extends RefCounted
+## 语音长度池（按《游戏总文案(1)(2) (1).docx》的颜色标注）。
+##
+## 颜色口径：蓝色 = 短句；绿色 = 长句；紫色 = 前长后短；黄色 = 前短后长。
+## 用途：之后按这里的分组去触发"对应长度"的语音。
+##   short      → 播一段短语音
+##   long       → 播一段长语音
+##   long_short → 前长后短：先播长语音，再播短语音（split 是断开位置，按汉字计）
+##   short_long → 前短后长：先播短语音，再播长语音
+## 每条都带 text（汉字，打字用）和 pinyin（逐字音节），split=0 表示不分段。
+##
+## 语音文件：audio/voice/{pattern}_{speaker}.ogg
+##   speaker = father 对应 bleep014（父亲的声音），mother 对应 bleep023（母亲的声音）。
+## 音频格式统一用 mp3（Godot 原生支持；源文件其实是 mp4/AAC，已转码）。
+
+const VOICE_DIR := "res://audio/voice/"
+const SPEAKER_FATHER := "father"
+const SPEAKER_MOTHER := "mother"
+const SPEAKERS := ["father", "mother"]
+
+const PATTERN_OF_COLOR := {
+    "0070C0": "short",
+    "00B050": "long",
+    "7030A0": "long_short",
+    "FFC000": "short_long",
+}
+
+const POOLS := {
+	"short": [
+		{"text": "你什么时候回来的", "pinyin": ["ni", "shen", "me", "shi", "hou", "hui", "lai", "de"]},
+		{"text": "隔壁的孙三今年结婚了", "pinyin": ["ge", "bi", "de", "sun", "san", "jin", "nian", "jie", "hun", "le"]},
+		{"text": "你什么时候带个男朋友回来", "pinyin": ["ni", "shen", "me", "shi", "hou", "dai", "ge", "nan", "peng", "you", "hui", "lai"]},
+		{"text": "我给你做了你爱吃的小炒", "pinyin": ["wo", "gei", "ni", "zuo", "le", "ni", "ai", "chi", "de", "xiao", "chao"]},
+		{"text": "你妈的腰越来越不好了", "pinyin": ["ni", "ma", "de", "yao", "yue", "lai", "yue", "bu", "hao", "le"]},
+		{"text": "你的桌子你不在的时候我修好了", "pinyin": ["ni", "de", "zhuo", "zi", "ni", "bu", "zai", "de", "shi", "hou", "wo", "xiu", "hao", "le"]},
+		{"text": "房门别关上啊", "pinyin": ["fang", "men", "bie", "guan", "shang", "a"]},
+		{"text": "你什么时候去上班啊", "pinyin": ["ni", "shen", "me", "shi", "hou", "qu", "shang", "ban", "a"]},
+		{"text": "你们公司的那个谁看着不错啊", "pinyin": ["ni", "men", "gong", "si", "de", "na", "ge", "shui", "kan", "zhe", "bu", "cuo", "a"]},
+		{"text": "你上次一起去吃饭的那个男的长得还可以", "pinyin": ["ni", "shang", "ci", "yi", "qi", "qu", "chi", "fan", "de", "na", "ge", "nan", "de", "zhang", "de", "hai", "ke", "yi"]},
+		{"text": "妈妈爸爸想你了", "pinyin": ["ma", "ma", "ba", "ba", "xiang", "ni", "le"]},
+		{"text": "少吃点没营养的东西", "pinyin": ["shao", "chi", "dian", "mei", "ying", "yang", "de", "dong", "xi"]},
+		{"text": "没事我们在家还好不要管我们", "pinyin": ["mei", "shi", "wo", "men", "zai", "jia", "hai", "hao", "bu", "yao", "guan", "wo", "men"]},
+		{"text": "咳咳咳都是小毛病", "pinyin": ["hai", "hai", "ke", "dou", "shi", "xiao", "mao", "bing"]},
+		{"text": "你爸今天糊涂了把牙膏当鞋油用", "pinyin": ["ni", "ba", "jin", "tian", "hu", "tu", "le", "ba", "ya", "gao", "dang", "xie", "you", "yong"]},
+		{"text": "怎么去那么远的地方", "pinyin": ["zen", "me", "qu", "na", "me", "yuan", "de", "di", "fang"]},
+		{"text": "在外面少惹事啊", "pinyin": ["zai", "wai", "mian", "shao", "re", "shi", "a"]},
+		{"text": "你今天吃了什么", "pinyin": ["ni", "jin", "tian", "chi", "le", "shen", "me"]},
+		{"text": "我像你这么大的时候都生下你了", "pinyin": ["wo", "xiang", "ni", "zhe", "me", "da", "de", "shi", "hou", "dou", "sheng", "xia", "ni", "le"]},
+		{"text": "我们怎么不早点死了算了", "pinyin": ["wo", "men", "zen", "me", "bu", "zao", "dian", "si", "le", "suan", "le"]},
+		{"text": "这个月工资还没发吗", "pinyin": ["zhe", "ge", "yue", "gong", "zi", "hai", "mei", "fa", "ma"]},
+		{"text": "你累了就不要说了", "pinyin": ["ni", "lei", "le", "jiu", "bu", "yao", "shuo", "le"]},
+		{"text": "想吃饺子了我们包一点给你邮过去", "pinyin": ["xiang", "chi", "jiao", "zi", "le", "wo", "men", "bao", "yi", "dian", "gei", "ni", "you", "guo", "qu"]},
+		{"text": "不要把门关上", "pinyin": ["bu", "yao", "ba", "men", "guan", "shang"]},
+		{"text": "一进屋就看见你房间关着个门难看死了", "pinyin": ["yi", "jin", "wu", "jiu", "kan", "jian", "ni", "fang", "jian", "guan", "zhe", "ge", "men", "nan", "kan", "si", "le"]},
+		{"text": "我说了一个小时做完你看看你写了多少才", "pinyin": ["wo", "shuo", "le", "yi", "ge", "xiao", "shi", "zuo", "wan", "ni", "kan", "kan", "ni", "xie", "le", "duo", "shao", "cai"]},
+		{"text": "你的被子我洗好换新的了", "pinyin": ["ni", "de", "bei", "zi", "wo", "xi", "hao", "huan", "xin", "de", "le"]},
+		{"text": "去学校记得拿饭", "pinyin": ["qu", "xue", "xiao", "ji", "de", "na", "fan"]},
+		{"text": "说了多少次了吃东西前要洗手", "pinyin": ["shuo", "le", "duo", "shao", "ci", "le", "chi", "dong", "xi", "qian", "yao", "xi", "shou"]},
+		{"text": "做完作业再玩玩具", "pinyin": ["zuo", "wan", "zuo", "ye", "zai", "wan", "wan", "ju"]},
+		{"text": "是不是看到别人有了才想买的", "pinyin": ["shi", "bu", "shi", "kan", "dao", "bie", "ren", "you", "le", "cai", "xiang", "mai", "de"]},
+		{"text": "你以为爸爸妈妈挣钱容易吗", "pinyin": ["ni", "yi", "wei", "ba", "ba", "ma", "ma", "zheng", "qian", "rong", "yi", "ma"]},
+		{"text": "你下次考好了就带你去玩", "pinyin": ["ni", "xia", "ci", "kao", "hao", "le", "jiu", "dai", "ni", "qu", "wan"]},
+		{"text": "让你吃亏了才能长记性", "pinyin": ["rang", "ni", "chi", "kui", "le", "cai", "neng", "zhang", "ji", "xing"]},
+		{"text": "唉你说你怎么不像你表姐那么聪明", "pinyin": ["ai", "ni", "shuo", "ni", "zen", "me", "bu", "xiang", "ni", "biao", "jie", "na", "me", "cong", "ming"]},
+		{"text": "别显得一天天跟我们欠你一样", "pinyin": ["bie", "xian", "de", "yi", "tian", "tian", "gen", "wo", "men", "qian", "ni", "yi", "yang"]},
+		{"text": "老师为什么只说你一个人", "pinyin": ["lao", "shi", "wei", "shen", "me", "zhi", "shuo", "ni", "yi", "ge", "ren"]},
+		{"text": "下次别人笑话你你不要听就好了", "pinyin": ["xia", "ci", "bie", "ren", "xiao", "hua", "ni", "ni", "bu", "yao", "ting", "jiu", "hao", "le"]},
+		{"text": "你在学校有什么事怎么不给我们说", "pinyin": ["ni", "zai", "xue", "xiao", "you", "shen", "me", "shi", "zen", "me", "bu", "gei", "wo", "men", "shuo"]},
+		{"text": "谁教你这么和爸妈说话的", "pinyin": ["shui", "jiao", "ni", "zhe", "me", "he", "ba", "ma", "shuo", "hua", "de"]},
+		{"text": "你自己想想自己哪里做错了", "pinyin": ["ni", "zi", "ji", "xiang", "xiang", "zi", "ji", "na", "li", "zuo", "cuo", "le"]},
+		{"text": "想要什么东西就给爸爸妈妈说", "pinyin": ["xiang", "yao", "shen", "me", "dong", "xi", "jiu", "gei", "ba", "ba", "ma", "ma", "shuo"]},
+		{"text": "今天老师在群里表扬你了", "pinyin": ["jin", "tian", "lao", "shi", "zai", "qun", "li", "biao", "yang", "ni", "le"]},
+		{"text": "谁是爸爸妈妈的小棉袄呀", "pinyin": ["shui", "shi", "ba", "ba", "ma", "ma", "de", "xiao", "mian", "ao", "ya"]},
+		{"text": "明天我们吃炖排骨好不好", "pinyin": ["ming", "tian", "wo", "men", "chi", "dun", "pai", "gu", "hao", "bu", "hao"]},
+		{"text": "好棒呀今天会给妈妈捶背了", "pinyin": ["hao", "bang", "ya", "jin", "tian", "hui", "gei", "ma", "ma", "chui", "bei", "le"]},
+		{"text": "我们等宝宝以后长大挣大钱了给爸爸妈妈花", "pinyin": ["wo", "men", "deng", "bao", "bao", "yi", "hou", "zhang", "da", "zheng", "da", "qian", "le", "gei", "ba", "ba", "ma", "ma", "hua"]},
+		{"text": "明天背新书包去上学开不开心", "pinyin": ["ming", "tian", "bei", "xin", "shu", "bao", "qu", "shang", "xue", "kai", "bu", "kai", "xin"]},
+		{"text": "爸爸妈妈会一直陪着你的", "pinyin": ["ba", "ba", "ma", "ma", "hui", "yi", "zhi", "pei", "zhe", "ni", "de"]},
+		{"text": "我女儿可比你年轻的时候强多了", "pinyin": ["wo", "nv", "er", "ke", "bi", "ni", "nian", "qing", "de", "shi", "hou", "qiang", "duo", "le"]},
+		{"text": "阳台上你爷爷种的菜这个时候本来该熟了", "pinyin": ["yang", "tai", "shang", "ni", "ye", "ye", "zhong", "de", "cai", "zhe", "ge", "shi", "hou", "ben", "lai", "gai", "shu", "le"]},
+		{"text": "你不会修的找个师傅吧", "pinyin": ["ni", "bu", "hui", "xiu", "de", "zhao", "ge", "shi", "fu", "ba"]},
+		{"text": "苹果记得先削皮", "pinyin": ["ping", "guo", "ji", "de", "xian", "xiao", "pi"]},
+		{"text": "你一个人怎么行", "pinyin": ["ni", "yi", "ge", "ren", "zen", "me", "xing"]},
+		{"text": "你一个人也得好好过", "pinyin": ["ni", "yi", "ge", "ren", "ye", "de", "hao", "hao", "guo"]},
+		{"text": "家里的蒲公英茶给你寄一点过去能下火", "pinyin": ["jia", "li", "de", "pu", "gong", "ying", "cha", "gei", "ni", "ji", "yi", "dian", "guo", "qu", "neng", "xia", "huo"]},
+		{"text": "以后没人管你了怎么办", "pinyin": ["yi", "hou", "mei", "ren", "guan", "ni", "le", "zen", "me", "ban"]},
+		{"text": "啥时候咱们再去拍个照", "pinyin": ["sha", "shi", "hou", "zan", "men", "zai", "qu", "pai", "ge", "zhao"]},
+		{"text": "这里挺好玩的你有没有去过", "pinyin": ["zhe", "li", "ting", "hao", "wan", "de", "ni", "you", "mei", "you", "qu", "guo"]},
+		{"text": "今天还给家里打视频吗", "pinyin": ["jin", "tian", "huan", "gei", "jia", "li", "da", "shi", "pin", "ma"]},
+		{"text": "今年过年你能回来就好了", "pinyin": ["jin", "nian", "guo", "nian", "ni", "neng", "hui", "lai", "jiu", "hao", "le"]},
+		{"text": "是不是好久没吃妈妈做的饭了", "pinyin": ["shi", "bu", "shi", "hao", "jiu", "mei", "chi", "ma", "ma", "zuo", "de", "fan", "le"]},
+		{"text": "自己做饭记得做完饭关煤气", "pinyin": ["zi", "ji", "zuo", "fan", "ji", "de", "zuo", "wan", "fan", "guan", "mei", "qi"]},
+		{"text": "那些奖状我们真是舍不得拿下来", "pinyin": ["na", "xie", "jiang", "zhuang", "wo", "men", "zhen", "shi", "she", "bu", "de", "na", "xia", "lai"]},
+		{"text": "爸爸妈妈还能再活一百年", "pinyin": ["ba", "ba", "ma", "ma", "hai", "neng", "zai", "huo", "yi", "bai", "nian"]},
+		{"text": "人去世之后会变成星星吧", "pinyin": ["ren", "qu", "shi", "zhi", "hou", "hui", "bian", "cheng", "xing", "xing", "ba"]},
+		{"text": "如果我们走了你是不是会轻松一点", "pinyin": ["ru", "guo", "wo", "men", "zou", "le", "ni", "shi", "bu", "shi", "hui", "qing", "song", "yi", "dian"]},
+	],
+	"long": [
+		{"text": "妈妈今天出门看到一个衣服很适合你下次你回家咱们一起去看", "pinyin": ["ma", "ma", "jin", "tian", "chu", "men", "kan", "dao", "yi", "ge", "yi", "fu", "hen", "shi", "he", "ni", "xia", "ci", "ni", "hui", "jia", "zan", "men", "yi", "qi", "qu", "kan"]},
+		{"text": "爸妈不是非想让你结婚是怕我们走了以后你一个人怎么办", "pinyin": ["ba", "ma", "bu", "shi", "fei", "xiang", "rang", "ni", "jie", "hun", "shi", "pa", "wo", "men", "zou", "le", "yi", "hou", "ni", "yi", "ge", "ren", "zen", "me", "ban"]},
+		{"text": "裤子穿厚点别和你爸一样冻得成老寒腿一天尽受罪", "pinyin": ["ku", "zi", "chuan", "hou", "dian", "bie", "he", "ni", "ba", "yi", "yang", "dong", "de", "cheng", "lao", "han", "tui", "yi", "tian", "jin", "shou", "zui"]},
+		{"text": "听你二姑说隔壁村有一个和你差不多大的在县政府里头上班你要不今年回来去看看", "pinyin": ["ting", "ni", "er", "gu", "shuo", "ge", "bi", "cun", "you", "yi", "ge", "he", "ni", "cha", "bu", "duo", "da", "de", "zai", "xian", "zheng", "fu", "li", "tou", "shang", "ban", "ni", "yao", "bu", "jin", "nian", "hui", "lai", "qu", "kan", "kan"]},
+		{"text": "一天天就不让我们省心小时候就是这长大了还是", "pinyin": ["yi", "tian", "tian", "jiu", "bu", "rang", "wo", "men", "sheng", "xin", "xiao", "shi", "hou", "jiu", "shi", "zhe", "zhang", "da", "le", "hai", "shi"]},
+		{"text": "你那个娃娃我送表妹了给你买了一个新的为什么不喜欢这两个不是一样吗", "pinyin": ["ni", "na", "ge", "wa", "wa", "wo", "song", "biao", "mei", "le", "gei", "ni", "mai", "le", "yi", "ge", "xin", "de", "wei", "shen", "me", "bu", "xi", "huan", "zhe", "liang", "ge", "bu", "shi", "yi", "yang", "ma"]},
+		{"text": "吃饭的时候坐端正别狼吞虎咽的没一点女孩子的样子", "pinyin": ["chi", "fan", "de", "shi", "hou", "zuo", "duan", "zheng", "bie", "lang", "tun", "hu", "yan", "de", "mei", "yi", "dian", "nv", "hai", "zi", "de", "yang", "zi"]},
+		{"text": "就只考好一次别太骄傲了看你下次能不能考好再说", "pinyin": ["jiu", "zhi", "kao", "hao", "yi", "ci", "bie", "tai", "jiao", "ao", "le", "kan", "ni", "xia", "ci", "neng", "bu", "neng", "kao", "hao", "zai", "shuo"]},
+		{"text": "以后和表弟表妹玩的时候让着点他们你都多大了还不懂事", "pinyin": ["yi", "hou", "he", "biao", "di", "biao", "mei", "wan", "de", "shi", "hou", "rang", "zhe", "dian", "ta", "men", "ni", "dou", "duo", "da", "le", "hai", "bu", "dong", "shi"]},
+		{"text": "你怎么这么挑食我们好不容易给你做的都不吃你到底要吃什么", "pinyin": ["ni", "zen", "me", "zhe", "me", "tiao", "shi", "wo", "men", "hao", "bu", "rong", "yi", "gei", "ni", "zuo", "de", "dou", "bu", "chi", "ni", "dao", "di", "yao", "chi", "shen", "me"]},
+		{"text": "吃饭就好好吃哭什么哭别让我看见你吃饭的时候哭", "pinyin": ["chi", "fan", "jiu", "hao", "hao", "chi", "ku", "shen", "me", "ku", "bie", "rang", "wo", "kan", "jian", "ni", "chi", "fan", "de", "shi", "hou", "ku"]},
+		{"text": "那妈妈这次不对你说你到底想让妈妈怎么样你才能高兴", "pinyin": ["na", "ma", "ma", "zhe", "ci", "bu", "dui", "ni", "shuo", "ni", "dao", "di", "xiang", "rang", "ma", "ma", "zen", "me", "yang", "ni", "cai", "neng", "gao", "xing"]},
+		{"text": "爸爸今天忙就不回来了下次再陪你去", "pinyin": ["ba", "ba", "jin", "tian", "mang", "jiu", "bu", "hui", "lai", "le", "xia", "ci", "zai", "pei", "ni", "qu"]},
+		{"text": "一会出门跟紧爸爸妈妈别胡跑跑丢了就被坏人拐走了就永远见不到我们了", "pinyin": ["yi", "hui", "chu", "men", "gen", "jin", "ba", "ba", "ma", "ma", "bie", "hu", "pao", "pao", "diu", "le", "jiu", "bei", "huai", "ren", "guai", "zou", "le", "jiu", "yong", "yuan", "jian", "bu", "dao", "wo", "men", "le"]},
+		{"text": "你爱吃柚子今天出门又给你买了点多吃水果身体好", "pinyin": ["ni", "ai", "chi", "you", "zi", "jin", "tian", "chu", "men", "you", "gei", "ni", "mai", "le", "dian", "duo", "chi", "shui", "guo", "shen", "ti", "hao"]},
+		{"text": "上次孩子说不爱吃了下次做饭记得别放说几次都没记住", "pinyin": ["shang", "ci", "hai", "zi", "shuo", "bu", "ai", "chi", "le", "xia", "ci", "zuo", "fan", "ji", "de", "bie", "fang", "shuo", "ji", "ci", "dou", "mei", "ji", "zhu"]},
+		{"text": "嘘孩子还没起小点声你看看她窗帘有没有拉紧别给太阳照醒了", "pinyin": ["xu", "hai", "zi", "hai", "mei", "qi", "xiao", "dian", "sheng", "ni", "kan", "kan", "ta", "chuang", "lian", "you", "mei", "you", "la", "jin", "bie", "gei", "tai", "yang", "zhao", "xing", "le"]},
+		{"text": "工作记得隔一个小时站一下别跟小学一样一坐坐一天", "pinyin": ["gong", "zuo", "ji", "de", "ge", "yi", "ge", "xiao", "shi", "zhan", "yi", "xia", "bie", "gen", "xiao", "xue", "yi", "yang", "yi", "zuo", "zuo", "yi", "tian"]},
+		{"text": "奶奶家以前养的小狗生宝宝了等你回来了去看看毛茸茸的", "pinyin": ["nai", "nai", "jia", "yi", "qian", "yang", "de", "xiao", "gou", "sheng", "bao", "bao", "le", "deng", "ni", "hui", "lai", "le", "qu", "kan", "kan", "mao", "rong", "rong", "de"]},
+		{"text": "今天看见你的那些奖状都过去好多年了还能想起来你拿奖的样子", "pinyin": ["jin", "tian", "kan", "jian", "ni", "de", "na", "xie", "jiang", "zhuang", "dou", "guo", "qu", "hao", "duo", "nian", "le", "hai", "neng", "xiang", "qi", "lai", "ni", "na", "jiang", "de", "yang", "zi"]},
+		{"text": "哎呦现在是大人了会挣钱了自己攒着不用给我们", "pinyin": ["ai", "you", "xian", "zai", "shi", "da", "ren", "le", "hui", "zheng", "qian", "le", "zi", "ji", "zan", "zhe", "bu", "yong", "gei", "wo", "men"]},
+		{"text": "今天出门捡到一百块钱给你发过去让你沾沾爸爸的好运", "pinyin": ["jin", "tian", "chu", "men", "jian", "dao", "yi", "bai", "kuai", "qian", "gei", "ni", "fa", "guo", "qu", "rang", "ni", "zhan", "zhan", "ba", "ba", "de", "hao", "yun"]},
+		{"text": "你给妈妈买衣服她可高兴呢出去显摆了好几圈", "pinyin": ["ni", "gei", "ma", "ma", "mai", "yi", "fu", "ta", "ke", "gao", "xing", "ne", "chu", "qu", "xian", "bai", "le", "hao", "ji", "quan"]},
+	],
+	"long_short": [
+		{"text": "你爸的脚伤着了天天叫痛", "pinyin": ["ni", "ba", "de", "jiao", "shang", "zhe", "le", "tian", "tian", "jiao", "tong"], "split": 7, "split_auto": false},
+		{"text": "最近你还熬夜吗晚上早点睡", "pinyin": ["zui", "jin", "ni", "hai", "ao", "ye", "ma", "wan", "shang", "zao", "dian", "shui"], "split": 7, "split_auto": false},
+		{"text": "发的工资好好攒着以后要用不要乱花", "pinyin": ["fa", "de", "gong", "zi", "hao", "hao", "zan", "zhe", "yi", "hou", "yao", "yong", "bu", "yao", "luan", "hua"], "split": 12, "split_auto": false},
+		{"text": "自己在外面小心点不要被骗了", "pinyin": ["zi", "ji", "zai", "wai", "mian", "xiao", "xin", "dian", "bu", "yao", "bei", "pian", "le"], "split": 8, "split_auto": false},
+		{"text": "最近天气凉了多喝点热的生病就麻烦了", "pinyin": ["zui", "jin", "tian", "qi", "liang", "le", "duo", "he", "dian", "re", "de", "sheng", "bing", "jiu", "ma", "fan", "le"], "split": 11, "split_auto": false},
+		{"text": "怎么又乱买东西这个有什么用", "pinyin": ["zen", "me", "you", "luan", "mai", "dong", "xi", "zhe", "ge", "you", "shen", "me", "yong"], "split": 7, "split_auto": false},
+		{"text": "今年也不回来吗没事你忙你的", "pinyin": ["jin", "nian", "ye", "bu", "hui", "lai", "ma", "mei", "shi", "ni", "mang", "ni", "de"], "split": 7, "split_auto": false},
+		{"text": "咱们这今天下雨越来越冷了", "pinyin": ["zan", "men", "zhe", "jin", "tian", "xia", "yu", "yue", "lai", "yue", "leng", "le"], "split": 7, "split_auto": false},
+		{"text": "过啥母亲节父亲节的你管好你自己就行", "pinyin": ["guo", "sha", "mu", "qin", "jie", "fu", "qin", "jie", "de", "ni", "guan", "hao", "ni", "zi", "ji", "jiu", "xing"], "split": 9, "split_auto": false},
+		{"text": "有什么事和我们说着你自己处理不好", "pinyin": ["you", "shen", "me", "shi", "he", "wo", "men", "shuo", "zhe", "ni", "zi", "ji", "chu", "li", "bu", "hao"], "split": 9, "split_auto": false},
+		{"text": "我们给你说的时候你听着爸妈永远都不会害你的", "pinyin": ["wo", "men", "gei", "ni", "shuo", "de", "shi", "hou", "ni", "ting", "zhe", "ba", "ma", "yong", "yuan", "dou", "bu", "hui", "hai", "ni", "de"], "split": 11, "split_auto": false},
+		{"text": "我怎么不去管路人偏偏要管你还不是为你好", "pinyin": ["wo", "zen", "me", "bu", "qu", "guan", "lu", "ren", "pian", "pian", "yao", "guan", "ni", "hai", "bu", "shi", "wei", "ni", "hao"], "split": 13, "split_auto": false},
+		{"text": "怎么这么长时间不说话了还是忙吗", "pinyin": ["zen", "me", "zhe", "me", "zhang", "shi", "jian", "bu", "shuo", "hua", "le", "hai", "shi", "mang", "ma"], "split": 11, "split_auto": false},
+		{"text": "做完作业洗手去摸了本子脏", "pinyin": ["zuo", "wan", "zuo", "ye", "xi", "shou", "qu", "mo", "le", "ben", "zi", "zang"], "split": 7, "split_auto": false},
+		{"text": "刚刚见亲戚怎么不会叫人了在家怎么教你的", "pinyin": ["gang", "gang", "jian", "qin", "qi", "zen", "me", "bu", "hui", "jiao", "ren", "le", "zai", "jia", "zen", "me", "jiao", "ni", "de"], "split": 12, "split_auto": false},
+		{"text": "这孩子拍照苦着个脸干啥高兴点", "pinyin": ["zhe", "hai", "zi", "pai", "zhao", "ku", "zhe", "ge", "lian", "gan", "sha", "gao", "xing", "dian"], "split": 8, "split_auto": false},
+		{"text": "早知道当时就不生你了一天天尽气人", "pinyin": ["zao", "zhi", "dao", "dang", "shi", "jiu", "bu", "sheng", "ni", "le", "yi", "tian", "tian", "jin", "qi", "ren"], "split": 10, "split_auto": false},
+		{"text": "你怎么什么都干不好我不是教过你吗", "pinyin": ["ni", "zen", "me", "shen", "me", "dou", "gan", "bu", "hao", "wo", "bu", "shi", "jiao", "guo", "ni", "ma"], "split": 9, "split_auto": false},
+		{"text": "早上起来把被子叠整齐一天天跟猪窝一样", "pinyin": ["zao", "shang", "qi", "lai", "ba", "bei", "zi", "die", "zheng", "qi", "yi", "tian", "tian", "gen", "zhu", "wo", "yi", "yang"], "split": 10, "split_auto": false},
+		{"text": "别跟没见过世面一样我们什么没给你买", "pinyin": ["bie", "gen", "mei", "jian", "guo", "shi", "mian", "yi", "yang", "wo", "men", "shen", "me", "mei", "gei", "ni", "mai"], "split": 9, "split_auto": false},
+		{"text": "这次退步一点点没事下次赶上就可以", "pinyin": ["zhe", "ci", "tui", "bu", "yi", "dian", "dian", "mei", "shi", "xia", "ci", "gan", "shang", "jiu", "ke", "yi"], "split": 9, "split_auto": false},
+		{"text": "今年又长高了厘米我就说好好吃饭能长高吧", "pinyin": ["jin", "nian", "you", "zhang", "gao", "le", "li", "mi", "wo", "jiu", "shuo", "hao", "hao", "chi", "fan", "neng", "zhang", "gao", "ba"], "split": 10, "split_auto": false},
+		{"text": "你笑起来多好看呀以后多笑笑", "pinyin": ["ni", "xiao", "qi", "lai", "duo", "hao", "kan", "ya", "yi", "hou", "duo", "xiao", "xiao"], "split": 8, "split_auto": false},
+		{"text": "今天把饭全吃光了还帮妈妈洗碗真厉害", "pinyin": ["jin", "tian", "ba", "fan", "quan", "chi", "guang", "le", "hai", "bang", "ma", "ma", "xi", "wan", "zhen", "li", "hai"], "split": 9, "split_auto": false},
+		{"text": "你还是小宝宝的时候可乖呢像个小天使", "pinyin": ["ni", "hai", "shi", "xiao", "bao", "bao", "de", "shi", "hou", "ke", "guai", "ne", "xiang", "ge", "xiao", "tian", "shi"], "split": 12, "split_auto": false},
+		{"text": "宝宝穿新裙子好漂亮能和爸爸跳支舞吗", "pinyin": ["bao", "bao", "chuan", "xin", "qun", "zi", "hao", "piao", "liang", "neng", "he", "ba", "ba", "tiao", "zhi", "wu", "ma"], "split": 9, "split_auto": false},
+		{"text": "咱们年纪大了也花不了什么钱攒着留给孩子吧", "pinyin": ["zan", "men", "nian", "ji", "da", "le", "ye", "hua", "bu", "liao", "shen", "me", "qian", "zan", "zhe", "liu", "gei", "hai", "zi", "ba"], "split": 13, "split_auto": false},
+		{"text": "你看她这张照片多可爱不愧是我生的", "pinyin": ["ni", "kan", "ta", "zhe", "zhang", "zhao", "pian", "duo", "ke", "ai", "bu", "kui", "shi", "wo", "sheng", "de"], "split": 10, "split_auto": false},
+		{"text": "你看她是不是爱吃这个我回去的时候多买点", "pinyin": ["ni", "kan", "ta", "shi", "bu", "shi", "ai", "chi", "zhe", "ge", "wo", "hui", "qu", "de", "shi", "hou", "duo", "mai", "dian"], "split": 10, "split_auto": false},
+		{"text": "我不该把那个娃娃送给她表妹的只好给她买一个新的", "pinyin": ["wo", "bu", "gai", "ba", "na", "ge", "wa", "wa", "song", "gei", "ta", "biao", "mei", "de", "zhi", "hao", "gei", "ta", "mai", "yi", "ge", "xin", "de"], "split": 14, "split_auto": false},
+		{"text": "你身上那件羽绒服穿好几年了今年过年买个新的吧", "pinyin": ["ni", "shen", "shang", "na", "jian", "yu", "rong", "fu", "chuan", "hao", "ji", "nian", "le", "jin", "nian", "guo", "nian", "mai", "ge", "xin", "de", "ba"], "split": 13, "split_auto": false},
+		{"text": "吃饭的时候不要急慢慢吃别噎着了", "pinyin": ["chi", "fan", "de", "shi", "hou", "bu", "yao", "ji", "man", "man", "chi", "bie", "ye", "zhe", "le"], "split": 11, "split_auto": false},
+		{"text": "如果找不到能照顾好你的人就不要嫁了", "pinyin": ["ru", "guo", "zhao", "bu", "dao", "neng", "zhao", "gu", "hao", "ni", "de", "ren", "jiu", "bu", "yao", "jia", "le"], "split": 12, "split_auto": false},
+		{"text": "这件衣裳穿着真好看下次带妈妈去买", "pinyin": ["zhe", "jian", "yi", "shang", "chuan", "zhe", "zhen", "hao", "kan", "xia", "ci", "dai", "ma", "ma", "qu", "mai"], "split": 9, "split_auto": false},
+		{"text": "在外面不要太累了身体要紧", "pinyin": ["zai", "wai", "mian", "bu", "yao", "tai", "lei", "le", "shen", "ti", "yao", "jin"], "split": 8, "split_auto": false},
+		{"text": "大不了爸爸给你工资我们还养得起你", "pinyin": ["da", "bu", "liao", "ba", "ba", "gei", "ni", "gong", "zi", "wo", "men", "hai", "yang", "de", "qi", "ni"], "split": 9, "split_auto": false},
+		{"text": "晚上看手机亮度调低一点别在黑的地方看", "pinyin": ["wan", "shang", "kan", "shou", "ji", "liang", "du", "diao", "di", "yi", "dian", "bie", "zai", "hei", "de", "di", "fang", "kan"], "split": 11, "split_auto": false},
+		{"text": "你把钱留下给自己多买点好吃的家里有饭呢", "pinyin": ["ni", "ba", "qian", "liu", "xia", "gei", "zi", "ji", "duo", "mai", "dian", "hao", "chi", "de", "jia", "li", "you", "fan", "ne"], "split": 14, "split_auto": false},
+		{"text": "加班太累了就休息我们不差那一点点", "pinyin": ["jia", "ban", "tai", "lei", "le", "jiu", "xiu", "xi", "wo", "men", "bu", "cha", "na", "yi", "dian", "dian"], "split": 9, "split_auto": false},
+		{"text": "看见小孩总能想起小时候的你很可爱呢", "pinyin": ["kan", "jian", "xiao", "hai", "zong", "neng", "xiang", "qi", "xiao", "shi", "hou", "de", "ni", "hen", "ke", "ai", "ne"], "split": 13, "split_auto": false},
+		{"text": "每天至少喝八杯水缺水了也容易生病", "pinyin": ["mei", "tian", "zhi", "shao", "he", "ba", "bei", "shui", "que", "shui", "le", "ye", "rong", "yi", "sheng", "bing"], "split": 9, "split_auto": false},
+	],
+	"short_long": [
+		{"text": "你每天加班多久啊租房的室友怎么样", "pinyin": ["ni", "mei", "tian", "jia", "ban", "duo", "jiu", "a", "zu", "fang", "de", "shi", "you", "zen", "me", "yang"], "split": 7, "split_auto": false},
+		{"text": "上次去你表姐家人家孩子都上幼儿园了", "pinyin": ["shang", "ci", "qu", "ni", "biao", "jie", "jia", "ren", "jia", "hai", "zi", "dou", "shang", "you", "er", "yuan", "le"], "split": 7, "split_auto": false},
+		{"text": "我们知道你忙没时间给家里打电话", "pinyin": ["wo", "men", "zhi", "dao", "ni", "mang", "mei", "shi", "jian", "gei", "jia", "li", "da", "dian", "hua"], "split": 6, "split_auto": false},
+		{"text": "我不吃这个不是说了把钱攒着吗", "pinyin": ["wo", "bu", "chi", "zhe", "ge", "bu", "shi", "shuo", "le", "ba", "qian", "zan", "zhe", "ma"], "split": 5, "split_auto": false},
+		{"text": "你妈最近一直掉头发呢去医院检查医生说是没问题", "pinyin": ["ni", "ma", "zui", "jin", "yi", "zhi", "diao", "tou", "fa", "ne", "qu", "yi", "yuan", "jian", "cha", "yi", "sheng", "shuo", "shi", "mei", "wen", "ti"], "split": 10, "split_auto": false},
+		{"text": "少和别人深交今天和你好明天说不定就把你卖了", "pinyin": ["shao", "he", "bie", "ren", "shen", "jiao", "jin", "tian", "he", "ni", "hao", "ming", "tian", "shuo", "bu", "ding", "jiu", "ba", "ni", "mai", "le"], "split": 6, "split_auto": false},
+		{"text": "那床被子薄吗要不再给你打一条厚点的", "pinyin": ["na", "chuang", "bei", "zi", "bao", "ma", "yao", "bu", "zai", "gei", "ni", "da", "yi", "tiao", "hou", "dian", "de"], "split": 6, "split_auto": false},
+		{"text": "少看点手机眼睛要瞎在手机上了", "pinyin": ["shao", "kan", "dian", "shou", "ji", "yan", "jing", "yao", "xia", "zai", "shou", "ji", "shang", "le"], "split": 5, "split_auto": false},
+		{"text": "作业做完了吗你都坐着三个钟了", "pinyin": ["zuo", "ye", "zuo", "wan", "le", "ma", "ni", "dou", "zuo", "zhe", "san", "ge", "zhong", "le"], "split": 6, "split_auto": false},
+		{"text": "这个不是你要的吗给你买了怎么又不喜欢", "pinyin": ["zhe", "ge", "bu", "shi", "ni", "yao", "de", "ma", "gei", "ni", "mai", "le", "zen", "me", "you", "bu", "xi", "huan"], "split": 8, "split_auto": false},
+		{"text": "进门把鞋摆好给你说多少遍了就是不听", "pinyin": ["jin", "men", "ba", "xie", "bai", "hao", "gei", "ni", "shuo", "duo", "shao", "bian", "le", "jiu", "shi", "bu", "ting"], "split": 6, "split_auto": false},
+		{"text": "这都不会干以后嫁出去人家婆家都嫌弃你", "pinyin": ["zhe", "dou", "bu", "hui", "gan", "yi", "hou", "jia", "chu", "qu", "ren", "jia", "po", "jia", "dou", "xian", "qi", "ni"], "split": 5, "split_auto": false},
+		{"text": "谁让你招惹别人的我就说别和他们玩", "pinyin": ["shui", "rang", "ni", "zhao", "re", "bie", "ren", "de", "wo", "jiu", "shuo", "bie", "he", "ta", "men", "wan"], "split": 7, "split_auto": false},
+		{"text": "这道题都不会吗掏钱让你上补习班白上了", "pinyin": ["zhe", "dao", "ti", "dou", "bu", "hui", "ma", "tao", "qian", "rang", "ni", "shang", "bu", "xi", "ban", "bai", "shang", "le"], "split": 7, "split_auto": false},
+		{"text": "哭什么哭你委屈我还比你委屈呢", "pinyin": ["ku", "shen", "me", "ku", "ni", "wei", "qu", "wo", "hai", "bi", "ni", "wei", "qu", "ne"], "split": 4, "split_auto": false},
+		{"text": "这有什么好哭的再买一个一样的不就好了", "pinyin": ["zhe", "you", "shen", "me", "hao", "ku", "de", "zai", "mai", "yi", "ge", "yi", "yang", "de", "bu", "jiu", "hao", "le"], "split": 7, "split_auto": false},
+		{"text": "现在不吃苦以后的苦有你吃的", "pinyin": ["xian", "zai", "bu", "chi", "ku", "yi", "hou", "de", "ku", "you", "ni", "chi", "de"], "split": 5, "split_auto": false},
+		{"text": "少看点电视动画片里那些都是假的", "pinyin": ["shao", "kan", "dian", "dian", "shi", "dong", "hua", "pian", "li", "na", "xie", "dou", "shi", "jia", "de"], "split": 5, "split_auto": false},
+		{"text": "这衣服怎么不穿我看着挺好看的啊", "pinyin": ["zhe", "yi", "fu", "zen", "me", "bu", "chuan", "wo", "kan", "zhe", "ting", "hao", "kan", "de", "a"], "split": 7, "split_auto": false},
+		{"text": "小狗有什么好的到时候咬你一口得狂犬病就死了", "pinyin": ["xiao", "gou", "you", "shen", "me", "hao", "de", "dao", "shi", "hou", "yao", "ni", "yi", "kou", "de", "kuang", "quan", "bing", "jiu", "si", "le"], "split": 7, "split_auto": false},
+		{"text": "少吃点零食你没看那些小孩吃零食得白血病死了啊", "pinyin": ["shao", "chi", "dian", "ling", "shi", "ni", "mei", "kan", "na", "xie", "xiao", "hai", "chi", "ling", "shi", "de", "bai", "xue", "bing", "si", "le", "a"], "split": 5, "split_auto": false},
+		{"text": "他们为啥不和你玩他们不和你玩你就不会找别人吗", "pinyin": ["ta", "men", "wei", "sha", "bu", "he", "ni", "wan", "ta", "men", "bu", "he", "ni", "wan", "ni", "jiu", "bu", "hui", "zhao", "bie", "ren", "ma"], "split": 8, "split_auto": false},
+		{"text": "你已经是大孩子了能不能让我们省点心", "pinyin": ["ni", "yi", "jing", "shi", "da", "hai", "zi", "le", "neng", "bu", "neng", "rang", "wo", "men", "sheng", "dian", "xin"], "split": 8, "split_auto": false},
+		{"text": "谁欺负你了我去找班主任问问怎么回事", "pinyin": ["shui", "qi", "fu", "ni", "le", "wo", "qu", "zhao", "ban", "zhu", "ren", "wen", "wen", "zen", "me", "hui", "shi"], "split": 5, "split_auto": false},
+		{"text": "下次想去哪里玩考好了就带你去", "pinyin": ["xia", "ci", "xiang", "qu", "na", "li", "wan", "kao", "hao", "le", "jiu", "dai", "ni", "qu"], "split": 6, "split_auto": false},
+		{"text": "爸爸明天回家给你买了你最喜欢的娃娃", "pinyin": ["ba", "ba", "ming", "tian", "hui", "jia", "gei", "ni", "mai", "le", "ni", "zui", "xi", "huan", "de", "wa", "wa"], "split": 6, "split_auto": false},
+		{"text": "这是你的新朋友吗你们可以一起来家里玩", "pinyin": ["zhe", "shi", "ni", "de", "xin", "peng", "you", "ma", "ni", "men", "ke", "yi", "yi", "qi", "lai", "jia", "li", "wan"], "split": 8, "split_auto": false},
+		{"text": "看完这集就睡觉好吗明天还上学呢别睡太晚", "pinyin": ["kan", "wan", "zhe", "ji", "jiu", "shui", "jiao", "hao", "ma", "ming", "tian", "hai", "shang", "xue", "ne", "bie", "shui", "tai", "wan"], "split": 9, "split_auto": false},
+		{"text": "家里的橘子熟了我们给她邮一点过去", "pinyin": ["jia", "li", "de", "ju", "zi", "shu", "le", "wo", "men", "gei", "ta", "you", "yi", "dian", "guo", "qu"], "split": 7, "split_auto": false},
+		{"text": "没事少打扰孩子她现在可忙哩", "pinyin": ["mei", "shi", "shao", "da", "rao", "hai", "zi", "ta", "xian", "zai", "ke", "mang", "li"], "split": 5, "split_auto": false},
+		{"text": "门开着吧要不都看不见你", "pinyin": ["men", "kai", "zhe", "ba", "yao", "bu", "dou", "kan", "bu", "jian", "ni"], "split": 4, "split_auto": false},
+		{"text": "你是不聪明但你坐的比人家久啊", "pinyin": ["ni", "shi", "bu", "cong", "ming", "dan", "ni", "zuo", "de", "bi", "ren", "jia", "jiu", "a"], "split": 5, "split_auto": false},
+		{"text": "最近容易上火少吃点辣的", "pinyin": ["zui", "jin", "rong", "yi", "shang", "huo", "shao", "chi", "dian", "la", "de"], "split": 4, "split_auto": false},
+		{"text": "感冒就难受了平时多注意一点", "pinyin": ["gan", "mao", "jiu", "nan", "shou", "le", "ping", "shi", "duo", "zhu", "yi", "yi", "dian"], "split": 6, "split_auto": false},
+		{"text": "水烧开再喝别拉肚子了", "pinyin": ["shui", "shao", "kai", "zai", "he", "bie", "la", "du", "zi", "le"], "split": 4, "split_auto": false},
+		{"text": "今天天气很好把被子拿出去晒晒", "pinyin": ["jin", "tian", "tian", "qi", "hen", "hao", "ba", "bei", "zi", "na", "chu", "qu", "shai", "shai"], "split": 6, "split_auto": false},
+		{"text": "我们一直在家里你觉得外面不行了就回来", "pinyin": ["wo", "men", "yi", "zhi", "zai", "jia", "li", "ni", "jue", "de", "wai", "mian", "bu", "xing", "le", "jiu", "hui", "lai"], "split": 7, "split_auto": false},
+		{"text": "小心点好不容易挣的钱别让人给你骗了", "pinyin": ["xiao", "xin", "dian", "hao", "bu", "rong", "yi", "zheng", "de", "qian", "bie", "rang", "ren", "gei", "ni", "pian", "le"], "split": 3, "split_auto": false},
+		{"text": "早点睡要不早上起来头疼", "pinyin": ["zao", "dian", "shui", "yao", "bu", "zao", "shang", "qi", "lai", "tou", "teng"], "split": 3, "split_auto": false},
+		{"text": "自己会剥柚子吗要是不行的话就买那种人家剥好的", "pinyin": ["zi", "ji", "hui", "bo", "you", "zi", "ma", "yao", "shi", "bu", "xing", "de", "hua", "jiu", "mai", "na", "zhong", "ren", "jia", "bo", "hao", "de"], "split": 7, "split_auto": false},
+		{"text": "你可争气呢我们都为你骄傲", "pinyin": ["ni", "ke", "zheng", "qi", "ne", "wo", "men", "dou", "wei", "ni", "jiao", "ao"], "split": 5, "split_auto": false},
+	],
+}
+
+
+## 取某一型的全部条目。
+static func pool(pattern: String) -> Array:
+	if POOLS.has(pattern):
+		return POOLS[pattern]
+	return []
+
+
+## 按句子文本反查它属于哪一型（找不到返回空字典）。
+## 某个「长度型 + 说话人」的语音路径（父亲=014，母亲=023）。
+static func voice_path(pattern: String, speaker: String) -> String:
+	return "%s%s_%s.mp3" % [VOICE_DIR, pattern, speaker]
+
+
+## 载入语音；找不到对应文件时返回 null。
+static func load_voice(pattern: String, speaker: String) -> AudioStream:
+	var path := voice_path(pattern, speaker)
+	if ResourceLoader.exists(path):
+		return load(path)
+	return null
+
+
+## bleep 编号 → 说话人：14 = 父亲，23 = 母亲。
+static func speaker_from_bleep(bleep: int) -> String:
+	return SPEAKER_FATHER if bleep == 14 else SPEAKER_MOTHER
+
+
+static func find(text: String) -> Dictionary:
+	for pattern in POOLS.keys():
+		for item in POOLS[pattern]:
+			if item["text"] == text:
+				return {"pattern": pattern, "split": item.get("split", 0)}
+	return {}
