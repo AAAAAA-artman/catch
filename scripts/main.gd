@@ -352,6 +352,8 @@ func _start_game(mode: String) -> void:
 		phase2_room.reset()
 	if phase3_gallery != null:
 		phase3_gallery.reset()
+	_dialog_home_rect = Rect2()
+	_dialog_hidden_p3 = false
 	if tears_fx != null:
 		tears_fx.hide_now()
 	# 恢复对话框位置（上一局第三阶段可能把它移开了）
@@ -936,6 +938,20 @@ func _save_records() -> void:
 func _show_feedback(message: String, color: Color) -> void:
 	if feedback_tween and feedback_tween.is_running():
 		feedback_tween.kill()
+	# 第三阶段面板在屏幕中央，反馈文字要挪到面板下方，别压住内容
+	if _dialog_hidden_p3:
+		var panel: Control = %SentencePanel
+		if panel != null:
+			feedback_label.anchor_top = 0.0
+			feedback_label.anchor_bottom = 0.0
+			feedback_label.offset_top = panel.position.y + panel.size.y + 16.0
+			feedback_label.offset_bottom = feedback_label.offset_top + 48.0
+	else:
+		var vp := get_viewport_rect().size
+		feedback_label.anchor_top = 0.5
+		feedback_label.anchor_bottom = 0.5
+		feedback_label.offset_top = -24.0
+		feedback_label.offset_bottom = 24.0
 	feedback_label.text = message
 	feedback_label.add_theme_color_override("font_color", color)
 	feedback_label.modulate = Color.WHITE
@@ -1017,49 +1033,21 @@ func _spawn_curved_sentence(body: String, tone: String) -> void:
 	settings["fade_glyph_drift"] = Vector2.ZERO
 	settings["fade_shrink"] = 1.0
 	var phase_name := _sentence_phase()
-	if phase_name == "phase1":
-		# 第一阶段：平直，不弯
+	if phase_name == "phase1" or phase_name == "phase3":
+		# 第一阶段 + 第三阶段：平直，不弯
 		settings["curve_mode"] = CurvedText.CurveShape.STRAIGHT
 		settings["rotate_follow"] = 0.0
 		settings["radius"] = 0.0
-	elif phase_name == "phase3":
-		# 第三阶段：没有对话框了，字直接飘在屏幕里 —— 用更夸张的曲线
-		# 逐句轮换 ARC / WAVE / CIRCLE / BEZIER，避免每句都一样
-		match round_number % 4:
-			0:
-				settings["curve_mode"] = CurvedText.CurveShape.ARC
-				settings["radius"] = 420.0
-				settings["rotate_follow"] = 1.0
-			1:
-				settings["curve_mode"] = CurvedText.CurveShape.WAVE
-				settings["wave_amplitude"] = 34.0
-				settings["wave_length"] = 380.0
-				settings["rotate_follow"] = 0.65
-			2:
-				settings["curve_mode"] = CurvedText.CurveShape.BEZIER
-				settings["bezier_bulge"] = 150.0
-				settings["rotate_follow"] = 0.8
-			_:
-				settings["curve_mode"] = CurvedText.CurveShape.CIRCLE
-				settings["radius"] = 210.0
-				settings["rotate_follow"] = 1.0
-		settings["outline_size"] = 6
 	else:
 		settings["curve_mode"] = CurvedText.CurveShape.ARC
 		settings["radius"] = 560.0
 		settings["rotate_follow"] = 1.0
 	var stage_size := _stage_size()
-	var is_p3 := _sentence_phase() == "phase3"
 	var line_gap := float(font_size) * 1.42
 	var center_y := stage_size.y * (0.30 if lines.size() <= 1 else 0.34)
-	# 第三阶段没有对话框，字直接飘在屏幕中央；字号也放大一点
-	if is_p3:
-		# 第三阶段：字放屏幕下半部（避开人脸），字号加大
-		center_y = stage_size.y * 0.72
-		if font_size < 42:
-			font_size = 42
-			settings["font_size"] = 42
-		line_gap = float(font_size) * 1.55
+	# 第三阶段面板会移到屏幕中央，飘字上移避免重叠
+	if _sentence_phase() == "phase3" and _dialog_hidden_p3:
+		center_y = stage_size.y * 0.14
 	for i in lines.size():
 		var y := center_y + (float(i) - float(lines.size() - 1) * 0.5) * line_gap
 		var anchor := Vector2(stage_size.x * 0.5, y)
@@ -1254,7 +1242,7 @@ var _cell_tween: Tween = null
 ## 第三阶段把对话框移开的 tween
 var _dialog_swing_tween: Tween = null
 ## 对话框的原始 offset_top（用于复位）
-var _dialog_home_top := -1.0
+var _dialog_home_rect := Rect2()
 ## 第三阶段是否已把对话框移开
 var _dialog_hidden_p3 := false
 ## 父母合影闪现是否已触发过（一个阶段只触发一次）
@@ -1549,7 +1537,7 @@ func _update_mood_layer() -> void:
 			if want_gallery3:
 				pass   # 移开动作在第一句打完后由 _notify_phase3_first_done 触发
 			else:
-				_swing_dialog_away(false)
+				_promote_dialog_center(false)
 		if want_gallery3:
 			phase3_gallery.set_progress(_stage3_progress())
 
@@ -1758,48 +1746,86 @@ func _notify_phase3_first_done() -> void:
 	if _story_stage() != 3:
 		return
 	if phase3_gallery == null or phase3_gallery.is_expanded():
-		return   # 已经拉开过了，不重复触发
-	# 1) 照片拉开
-	if phase3_gallery != null:
-		phase3_gallery.expand_to_full()
-	# 2) 对话框向下移开
-	_swing_dialog_away(true)
-	# 3) 飘字用第三阶段的曲线（下一句开始生效）
+		return   # 已经切换过了，不重复触发
+	# 1) 照片拉开成全屏
+	phase3_gallery.expand_to_full()
+	# 2) 把对话框（输入区）移到屏幕中央并放大
+	_promote_dialog_center(true)
 
 
-## 把对话框向下移开 / 移回
-func _swing_dialog_away(away: bool) -> void:
+## 第三阶段切换后的布局：
+##   把 SentencePanel 从「底部横条」变成「屏幕中央的大面板」
+##   —— 汉字格 / 拼音格 / 输入框都在里面，平直显示，带输入反馈
+func _promote_dialog_center(promote: bool) -> void:
 	var panel: Control = %SentencePanel
 	if panel == null:
 		return
 	if _dialog_swing_tween != null and _dialog_swing_tween.is_valid():
 		_dialog_swing_tween.kill()
 
-	# 记录"复位用的原始坐标"（第一次移开时保存）
-	if _dialog_home_top < 0.0:
-		_dialog_home_top = panel.offset_top
+	# 记录原始坐标（第一次切换时保存）
+	if _dialog_home_rect.size.x <= 0.0:
+		_dialog_home_rect = Rect2(
+			panel.offset_left, panel.offset_top,
+			panel.offset_right - panel.offset_left,
+			panel.offset_bottom - panel.offset_top)
 
-	var h: float = panel.size.y + 40.0
-	var target_top: float = _dialog_home_top + (h if away else 0.0)
+	_dialog_hidden_p3 = promote
 
-	_dialog_hidden_p3 = away
+	var vp := get_viewport_rect().size
+	var target: Rect2
+	if promote:
+		# 屏幕中央：宽度占 78%，高度按内容算（不要固定大块空白）
+		var w := vp.x * 0.78
+		var h := panel.get_combined_minimum_size().y + 24.0
+		h = clampf(h, _dialog_home_rect.size.y * 1.15, vp.y * 0.55)
+		target = Rect2(Vector2((vp.x - w) * 0.5, (vp.y - h) * 0.5), Vector2(w, h))
+	else:
+		target = _dialog_home_rect
 
 	_dialog_swing_tween = create_tween()
 	_dialog_swing_tween.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_CUBIC)
-	# offset_top / offset_bottom 一起动，才是"整体下移"而不是"拉高"
 	_dialog_swing_tween.set_parallel(true)
-	var target_bottom: float = target_top + panel.size.y
-	_dialog_swing_tween.tween_property(panel, "offset_top", target_top, 1.2 if away else 0.9)
-	_dialog_swing_tween.tween_property(panel, "offset_bottom", target_bottom, 1.2 if away else 0.9)
+	_dialog_swing_tween.tween_property(panel, "offset_left", target.position.x, 1.1)
+	_dialog_swing_tween.tween_property(panel, "offset_top", target.position.y, 1.1)
+	_dialog_swing_tween.tween_property(panel, "offset_right", target.position.x + target.size.x, 1.1)
+	_dialog_swing_tween.tween_property(panel, "offset_bottom", target.position.y + target.size.y, 1.1)
+	# 宽度变了 → 字格必须按新宽度重排
+	_dialog_swing_tween.chain().tween_callback(_rebuild_cells_for_width)
 
 
-## 瞬时把对话框设到"已移开"的状态（换句复位后立即推回去）
+## 面板尺寸变化后，按新宽度重建字格（字号/折行都会变）
+func _rebuild_cells_for_width() -> void:
+	if phase != "playing":
+		return
+	if input_mode == "pinyin":
+		_build_pinyin_cells()
+	else:
+		_build_hanzi_cells()
+	_layout_sentence()
+	_update_typing_progress(input_box.text if input_box != null else "")
+
+
+## 瞬时把对话框设到「中央」状态（换句复位后立即推回去）
 func _apply_dialog_hidden_instant() -> void:
 	var panel: Control = %SentencePanel
-	if panel == null or _dialog_home_top < 0.0:
+	if panel == null or _dialog_home_rect.size.x <= 0.0:
+		return
+	if not _dialog_hidden_p3:
 		return
 	if _dialog_swing_tween != null and _dialog_swing_tween.is_valid():
 		_dialog_swing_tween.kill()
-	var target_top: float = _dialog_home_top + panel.size.y + 40.0
-	panel.offset_top = target_top
-	panel.offset_bottom = target_top + panel.size.y
+	var vp := get_viewport_rect().size
+	var w := vp.x * 0.78
+	var h := panel.get_combined_minimum_size().y + 24.0
+	h = clampf(h, _dialog_home_rect.size.y * 1.15, vp.y * 0.55)
+	var px := (vp.x - w) * 0.5
+	var py := (vp.y - h) * 0.5
+	panel.offset_left = px
+	panel.offset_top = py
+	panel.offset_right = px + w
+	panel.offset_bottom = py + h
+	# 宽度变了 → 字格按新宽度重排
+	call_deferred("_rebuild_cells_for_width")
+
+
