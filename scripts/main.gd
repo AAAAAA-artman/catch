@@ -211,6 +211,7 @@ func _ready() -> void:
 	_create_main_menu()
 	_build_pause_menu()
 	_build_tutorial_overlay()
+	_build_ending_layer()
 	_show_menu()
 	if bgm_player != null:
 		bgm_player.play("res://audio/bgm/intro_circulation.mp3")
@@ -280,6 +281,11 @@ func _input(event: InputEvent) -> void:
 		# Alt 松开 = 结束抵抗
 		if key.keycode == KEY_ALT and not key.pressed and resisting:
 			_end_resist()
+		return
+	if phase == "ending":
+		if key.keycode in [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER, KEY_ESCAPE]:
+			_skip_ending()
+			accept_event()
 		return
 	if phase == "tutorial":
 		if key.keycode in [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER, KEY_ESCAPE]:
@@ -381,6 +387,142 @@ func _apply_font_to_static_labels() -> void:
 			(node as LineEdit).add_theme_font_override("font", font)
 		elif node is ProgressBar:
 			pass
+
+
+## Ending 画面：半透明黑底 + 白字从下往上飘
+func _build_ending_layer() -> void:
+	_ending_layer = Control.new()
+	_ending_layer.name = "EndingLayer"
+	_ending_layer.z_index = 45
+	_ending_layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	_ending_layer.visible = false
+	add_child(_ending_layer)
+	_ending_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	var vp := get_viewport_rect().size
+
+	# 半透明黑底
+	var scrim := ColorRect.new()
+	scrim.name = "Scrim"
+	scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scrim.color = Color(0.0, 0.0, 0.0, 0.74)
+	scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ending_layer.add_child(scrim)
+
+	# 滚动容器：手动算每一行的 y，避免 VBox 在滚动容器里算不出高度
+	_ending_roll = Control.new()
+	_ending_roll.name = "Roll"
+	_ending_roll.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ending_layer.add_child(_ending_roll)
+
+	var font := _game_font_resource()
+	const FS := 25
+	const LINE_H := 46.0
+	var col_w := vp.x * 0.72
+	var col_x := vp.x * 0.14
+	var y := 0.0
+	for raw in EndingText.LINES:
+		var text := String(raw)
+		if text != "":
+			var l := Label.new()
+			l.text = text
+			l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			if font != null:
+				l.add_theme_font_override("font", font)
+			l.add_theme_font_size_override("font_size", FS)
+			l.add_theme_color_override("font_color", Color(0.95, 0.94, 0.90, 0.95))
+			l.position = Vector2(col_x, y)
+			l.size = Vector2(col_w, LINE_H)
+			_ending_roll.add_child(l)
+		y += LINE_H
+	_ending_content_h = y
+
+	# 底部渐变暗带 + 跳过提示
+	var foot := TextureRect.new()
+	foot.name = "FootGrad"
+	foot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	foot.anchor_left = 0.0
+	foot.anchor_right = 1.0
+	foot.anchor_top = 1.0
+	foot.anchor_bottom = 1.0
+	foot.offset_top = -100.0
+	foot.offset_bottom = 0.0
+	var g := Gradient.new()
+	g.set_color(0, Color(0, 0, 0, 0.0))
+	g.set_color(1, Color(0, 0, 0, 0.9))
+	var gt := GradientTexture2D.new()
+	gt.gradient = g
+	gt.fill_from = Vector2(0, 0)
+	gt.fill_to = Vector2(0, 1)
+	foot.texture = gt
+	_ending_layer.add_child(foot)
+
+	var hint := Label.new()
+	hint.name = "SkipHint"
+	hint.text = "空格 / 回车 / 点击 跳过"
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if font != null:
+		hint.add_theme_font_override("font", font)
+	hint.add_theme_font_size_override("font_size", 17)
+	hint.add_theme_color_override("font_color", Color(0.72, 0.72, 0.70, 0.95))
+	# 放右上角，避免和滚动文字打架
+	hint.anchor_left = 1.0
+	hint.anchor_right = 1.0
+	hint.anchor_top = 0.0
+	hint.anchor_bottom = 0.0
+	hint.offset_left = -320.0
+	hint.offset_right = -24.0
+	hint.offset_top = 18.0
+	hint.offset_bottom = 46.0
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_ending_layer.add_child(hint)
+
+
+## 播放 Ending 滚动。全部滚完会自动进结算画面。
+func _play_ending_roll() -> void:
+	if _ending_layer == null:
+		_end_game(true)
+		return
+	phase = "ending"
+	pause_overlay.hide()
+	story_overlay.hide()
+	# 只隐藏对局 HUD，保留第三阶段的全屏照片做底
+	_set_game_hud_visible(false)
+	if phase3_gallery != null:
+		phase3_gallery.visible = true
+		if phase3_gallery.has_method("snap_full"):
+			phase3_gallery.snap_full()
+	_ending_layer.visible = true
+
+	var vp := get_viewport_rect().size
+	_ending_roll.position = Vector2(0.0, vp.y)
+	if _ending_tween != null and _ending_tween.is_valid():
+		_ending_tween.kill()
+	# 速度约 30 像素/秒，太短的话给个下限
+	var duration: float = maxf(26.0, (_ending_content_h + vp.y) / 30.0)
+	_ending_tween = create_tween()
+	_ending_tween.tween_property(_ending_roll, "position:y", -_ending_content_h - 60.0, duration)
+	_ending_tween.tween_callback(_on_ending_finished)
+
+
+func _on_ending_finished() -> void:
+	if phase != "ending":
+		return
+	if _ending_tween != null and _ending_tween.is_valid():
+		_ending_tween.kill()
+	if _ending_layer != null:
+		_ending_layer.visible = false
+	_end_game(true)
+
+
+## 跳过 Ending
+func _skip_ending() -> void:
+	if phase != "ending":
+		return
+	_on_ending_finished()
 
 
 ## 游戏内的操作说明浮层（第一次进入时弹一次）
@@ -1376,6 +1518,11 @@ func _complete_sentence() -> void:
 		return
 	# 好感满：先打「终章 5 句」，打完才播结尾剧情 epilogue
 	if affection >= MAX_VALUE and not _final_played:
+		_spawn_curved_banner("你接住她们了", "positive", 3.2)
+		if not _dialog_hidden_p3:
+			sentence_label.text = "你接住她们了"
+			sentence_label.show()
+			state_label.text = "你接住她们了"
 		_start_final_phase()
 		return
 	if _start_story_chain(message):
@@ -1448,7 +1595,12 @@ func _stage_progress() -> float:
 func _check_loss() -> bool:
 	if debug_invincible:
 		return false
-	if pressure >= MAX_VALUE or numbness >= MAX_VALUE:
+	if pressure >= MAX_VALUE:
+		_game_over_text = "你崩溃了"
+		_end_game(false)
+		return true
+	if numbness >= MAX_VALUE:
+		_game_over_text = "你再也不会听见了"
 		_end_game(false)
 		return true
 	return false
@@ -1484,8 +1636,8 @@ func _end_game(won: bool) -> void:
 	_last_input_length = 0  # 换句/进剧情时同步重置击键计数
 	pinyin_row.hide()
 	sentence_label.show()
-	sentence_label.text = "你终于被听见了。" if won else "这场对话暂时结束了。"
-	state_label.text = "胜利 · 好感度已满" if won else "失败 · 压力或麻木已满，或句子用尽"
+	sentence_label.text = "你接住她们了" if won else (_game_over_text if _game_over_text != "" else "这场对话暂时结束了。")
+	state_label.text = "胜利 · 好感度已满" if won else "失败"
 	round_label.text = "R 重玩   1 汉字   2 拼音"
 	_save_records()
 	_refresh_stats()
@@ -1804,8 +1956,8 @@ func _on_story_finished(_segment_id: String) -> void:
 			_advance_sentence(pending_message)
 			_sync_bgm_for_act()
 		"ending":
-			# 终章已打完、结尾剧情也演完 → 正式结束
-			_end_game(true)
+			# 终章已打完、结尾剧情也演完 → 播 Ending 滚动字幕
+			_play_ending_roll()
 	story_resume = ""
 
 
@@ -1868,6 +2020,13 @@ var main_menu: Control = null
 var _pause_settings_open := false
 ## 游戏内的操作说明浮层
 var _tutorial_layer: Control = null
+## Ending 画面（半透明黑底 + 白字上飘）
+var _ending_layer: Control = null
+var _ending_roll: Control = null
+var _ending_tween: Tween = null
+var _ending_content_h := 0.0
+## 失败原因（显示在文本框里）
+var _game_over_text := ""
 ## 当前飘在画面上的句子节点（长句会拆成多行，所以是数组）
 var _curved_sentence_nodes: Array[Node2D] = []
 ## 对话框字格逐字浮现用的 tween

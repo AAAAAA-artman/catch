@@ -192,6 +192,25 @@ func show_image(path: String, fade: float = 0.85) -> void:
 	)
 
 
+## Ending 画面用：直接铺满全屏（无动画），保证黑屏下面有照片
+func snap_full() -> void:
+	if _root == null or _cover == null:
+		return
+	_root.visible = true
+	visible = true
+	_intro = false
+	_expanded = true
+	_index = 1
+	var vp := get_viewport_rect().size
+	if _cover.texture == null:
+		_cover.texture = _tex(1)
+	_cover.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_apply_rect(_cover, Rect2(Vector2.ZERO, vp))
+	_cover.modulate = Color(FULL_DIM, FULL_DIM, FULL_DIM, 1.0)
+	_swap.modulate.a = 0.0
+	_swap.texture = null
+
+
 func is_expanded() -> bool:
 	return _expanded
 
