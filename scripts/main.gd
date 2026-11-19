@@ -670,6 +670,10 @@ func _layout_sentence() -> void:
 	var row_h := _measure_flow_height(row, available)
 	row.size.y = row_h
 	lane.custom_minimum_size = Vector2(0.0, row_h + 6.0)
+	# 第三阶段：字浮在照片上，内容居中（FlowContainer 默认左对齐）
+	# 必须等 FlowContainer 排完再量，所以要 deferred
+	if _sentence_phase() == "phase3" and _dialog_hidden_p3:
+		call_deferred("_center_row_content", row, lane, available)
 
 
 func _place_cursor_after_layout() -> void:
@@ -1256,6 +1260,8 @@ var _dialog_home_rect := Rect2()
 var _dialog_hidden_p3 := false
 ## 第三阶段第一句的 round_number
 var _phase3_first_round := -1
+## 面板原始背景样式（移到中央时换透明）
+var _dialog_home_style: StyleBox = null
 ## 父母合影闪现是否已触发过（一个阶段只触发一次）
 var _parents_flash_fired := false
 ## 本阶段还要从 overheard 池抽几句（>0 表示正在用偷听句子）
@@ -1361,6 +1367,20 @@ func _stage_size() -> Vector2:
 const DIALOG_WIDTH_RATIO := 0.92
 ## 最多允许几行
 const MAX_TEXT_LINES := 3
+
+
+## 把 FlowContainer 里的内容水平居中（它本身不支持 alignment）
+func _center_row_content(row: Control, lane: Control, available: float) -> void:
+	var right := 0.0
+	for child in row.get_children():
+		var c := child as Control
+		if c == null:
+			continue
+		right = maxf(right, c.position.x + c.size.x)
+	if right <= 0.0 or right >= available - 2.0:
+		row.position.x = 0.0
+		return
+	row.position.x = (available - right) * 0.5
 
 
 ## 对话框内容区的实际像素尺寸（考虑版式缩放与 Panel 内边距）
@@ -1781,12 +1801,24 @@ func _promote_dialog_center(promote: bool) -> void:
 	if _dialog_swing_tween != null and _dialog_swing_tween.is_valid():
 		_dialog_swing_tween.kill()
 
-	# 记录原始坐标（第一次切换时保存）
+	# 记录原始坐标 / 背景样式（第一次切换时保存）
 	if _dialog_home_rect.size.x <= 0.0:
 		_dialog_home_rect = Rect2(
 			panel.offset_left, panel.offset_top,
 			panel.offset_right - panel.offset_left,
 			panel.offset_bottom - panel.offset_top)
+	if _dialog_home_style == null:
+		_dialog_home_style = panel.get_theme_stylebox("panel")
+
+	# 第三阶段把黑底面板换成完全透明的样式，字直接浮在照片上
+	if promote:
+		panel.add_theme_stylebox_override("panel", _make_transparent_panel_style())
+		if state_label != null:
+			state_label.visible = false
+	elif _dialog_home_style != null:
+		panel.add_theme_stylebox_override("panel", _dialog_home_style)
+		if state_label != null:
+			state_label.visible = true
 
 	_dialog_hidden_p3 = promote
 
@@ -1827,9 +1859,52 @@ func _rebuild_cells_for_width() -> void:
 		_build_hanzi_cells()
 	_layout_sentence()
 	_update_typing_progress(input_box.text if input_box != null else "")
+	_apply_p3_text_outline()
 	# 隐藏输入框后，面板高度要贴合内容（否则下方留一片空白）
 	if _dialog_hidden_p3:
-		call_deferred("_fit_panel_height_to_content")
+		call_deferred("_refit_panel_height_soon")
+
+
+## 第三阶段用的「几乎透明」面板样式：只留一点点暗底保证文字可读，
+## 没有边框、没有圆角、没有可见的框。
+func _make_transparent_panel_style() -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.0, 0.0, 0.0, 0.0)   # 完全透明，靠字描边保证可读
+	sb.border_width_left = 0
+	sb.border_width_top = 0
+	sb.border_width_right = 0
+	sb.border_width_bottom = 0
+	sb.corner_radius_top_left = 0
+	sb.corner_radius_top_right = 0
+	sb.corner_radius_bottom_right = 0
+	sb.corner_radius_bottom_left = 0
+	# 保留内边距，避免字贴边
+	var home_margin := 26.0
+	sb.content_margin_left = home_margin
+	sb.content_margin_right = home_margin
+	sb.content_margin_top = 18.0
+	sb.content_margin_bottom = 16.0
+	return sb
+
+
+## 第三阶段的字是直接浮在照片上的，给字格加描边保证可读
+func _apply_p3_text_outline() -> void:
+	if not _dialog_hidden_p3:
+		return
+	var dark := Color(0.0, 0.0, 0.0, 0.72)
+	for row in [hanzi_row, pinyin_row]:
+		if row == null:
+			continue
+		_apply_outline_recursive(row, dark)
+
+
+func _apply_outline_recursive(node: Node, color: Color) -> void:
+	for child in node.get_children():
+		var label := child as Label
+		if label != null:
+			label.add_theme_constant_override("outline_size", 5)
+			label.add_theme_color_override("font_outline_color", color)
+		_apply_outline_recursive(child, color)
 
 
 ## 瞬时把对话框设到「中央」状态（换句复位后立即推回去）
@@ -1862,12 +1937,86 @@ func _fit_panel_height_to_content() -> void:
 	var panel: Control = %SentencePanel
 	if panel == null:
 		return
-	var need: float = panel.get_combined_minimum_size().y + 8.0
+	if input_box != null:
+		input_box.visible = false   # 不参与测量
+
+	# 用内容实际高度度量（get_combined_minimum_size 在刚重建字格时可能还没刷新）
+	var need: float = _measure_panel_content_height(panel)
 	var cur: float = panel.offset_bottom - panel.offset_top
-	if absf(need - cur) < 4.0:
-		return
 	var vp := get_viewport_rect().size
-	var new_h: float = clampf(need, 120.0, vp.y * 0.55)
+	var new_h: float = clampf(need, 100.0, vp.y * 0.62)
+	if absf(new_h - cur) < 4.0:
+		return
 	var cy: float = (panel.offset_top + panel.offset_bottom) * 0.5
 	panel.offset_top = cy - new_h * 0.5
 	panel.offset_bottom = cy + new_h * 0.5
+
+
+## 量面板内容的真实高度：状态行(隐藏时0) + 句子行 + lane + 内边距
+func _measure_panel_content_height(panel: Control) -> float:
+	var contents := panel.get_node_or_null("Contents") as Control
+	if contents == null:
+		return panel.get_combined_minimum_size().y + 8.0
+	var total := 0.0
+	var sep := 10.0
+	var first := true
+	for child in contents.get_children():
+		var c := child as Control
+		if c == null or not c.visible:
+			continue
+		if c is Label or c is RichTextLabel or c is HFlowContainer or c is Control:
+			var h := c.size.y
+			if h <= 0.0:
+				h = c.get_combined_minimum_size().y
+			total += h
+			if not first:
+				total += sep
+			first = false
+	# 加上面板内边距
+	var sb := panel.get_theme_stylebox("panel")
+	if sb != null:
+		total += sb.content_margin_top + sb.content_margin_bottom
+	return total + 6.0
+
+
+## 延迟再校一次（字格刚重建时高度还没算准）
+func _refit_panel_height_soon() -> void:
+	get_tree().create_timer(0.10).timeout.connect(_refit_flow_geometry)
+	get_tree().create_timer(0.40).timeout.connect(_refit_flow_geometry)
+
+
+## 按字格的真实边界修正 lane / row 高度，然后重算面板高度。
+##
+## FlowContainer 的高度依赖当前可用宽度，而它自己的
+## get_combined_minimum_size() 在宽度定下来之前是错的。
+## 分两步：先给足高度让它把行排完，下一帧再量真实底边收回。
+func _refit_flow_geometry() -> void:
+	if not _dialog_hidden_p3 or phase != "playing":
+		return
+	var row: Control = hanzi_row if input_mode == "hanzi" else pinyin_row
+	if row == null or not row.visible:
+		return
+	var lane: Control = %SentenceLane
+
+	# 第一步：撑开，让所有行都排出来（不被裁剪）
+	var wide: float = 900.0
+	row.size.y = wide
+	lane.custom_minimum_size = Vector2(0.0, wide + 6.0)
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	# 第二步：量真实底边，收回合适高度
+	var bottom := 0.0
+	for child in row.get_children():
+		var c := child as Control
+		if c == null or not c.visible:
+			continue
+		bottom = maxf(bottom, c.position.y + c.size.y)
+	if bottom <= 1.0:
+		return
+	row.size.y = bottom + 2.0
+	lane.custom_minimum_size = Vector2(0.0, bottom + 6.0)
+	await get_tree().process_frame
+	_fit_panel_height_to_content()
+	# 居中要在最终高度定下来之后再做
+	call_deferred("_center_row_content", row, lane, lane.size.x)
