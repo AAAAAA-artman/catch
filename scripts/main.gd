@@ -204,7 +204,8 @@ func _ready() -> void:
 	_load_records()
 	input_box.text_changed.connect(_on_text_changed)
 	story_overlay.finished.connect(_on_story_finished)
-	_show_title()
+	_create_main_menu()
+	_show_menu()
 	if bgm_player != null:
 		bgm_player.play("res://audio/bgm/intro_circulation.mp3")
 
@@ -292,9 +293,11 @@ func _input(event: InputEvent) -> void:
 				input_box.call_deferred("grab_focus")
 			accept_event()
 		return
-	if phase == "title" and (key.keycode == KEY_1 or key.keycode == KEY_2):
-		_start_game("hanzi" if key.keycode == KEY_1 else "pinyin")
-		accept_event()
+	if phase == "menu":
+		# 主界面里 Esc 关闭设置面板
+		if key.keycode == KEY_ESCAPE and main_menu != null and main_menu.is_in_settings():
+			main_menu.call("_close_settings")
+			accept_event()
 	elif (phase == "won" or phase == "lost") and key.keycode == KEY_R:
 		_start_game(input_mode)
 		accept_event()
@@ -370,6 +373,78 @@ func _apply_font_to_static_labels() -> void:
 			(node as LineEdit).add_theme_font_override("font", font)
 		elif node is ProgressBar:
 			pass
+
+
+## 创建主界面（代码生成，不改场景文件）
+func _create_main_menu() -> void:
+	var script_res := load("res://scripts/main_menu.gd")
+	if script_res == null:
+		push_warning("Main: 找不到 main_menu.gd，直接进标题态")
+		_show_title()
+		return
+	main_menu = Control.new()
+	main_menu.set_script(script_res)
+	main_menu.name = "MainMenu"
+	main_menu.z_index = 60
+	add_child(main_menu)
+	# 程序化创建的 Control 默认尺寸是 0，必须显式铺满，
+	# 否则背景图和按钮都会按 0 尺寸布局（挤在左上角）
+	main_menu.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	main_menu.offset_left = 0.0
+	main_menu.offset_top = 0.0
+	main_menu.offset_right = 0.0
+	main_menu.offset_bottom = 0.0
+	main_menu.start_pressed.connect(_on_menu_start)
+	main_menu.quit_pressed.connect(_on_menu_quit)
+
+
+func _on_menu_start(mode: String) -> void:
+	if main_menu != null:
+		main_menu.close()
+	_set_game_hud_visible(true)
+	# 主界面可能改了音量，重新应用一次
+	_start_game(mode)
+
+
+func _on_menu_quit() -> void:
+	get_tree().quit()
+
+
+## 进入主界面：隐藏所有对局 HUD
+func _show_menu() -> void:
+	phase = "menu"
+	pause_overlay.hide()
+	feedback_label.hide()
+	cursor_rect.hide()
+	story_overlay.hide()
+	_set_game_hud_visible(false)
+	if main_menu != null:
+		main_menu.open()
+	_sync_bgm_for_act()
+
+
+## 对局 HUD 的整体显隐（主界面用）
+func _set_game_hud_visible(on: bool) -> void:
+	for node in [time_bar, pressure_bar, numbness_bar,
+			get_node_or_null("TimeCaption"),
+			get_node_or_null("PressureCaption"),
+			get_node_or_null("NumbnessCaption"),
+			get_node_or_null("%SentencePanel"),
+			get_node_or_null("%RoundLabel"),
+			get_node_or_null("%StatsLabel"),
+			get_node_or_null("StatsBack"),
+			circle_fx, tears_fx, p3_tears,
+			mood_layer, phase2_room, phase3_gallery, parents_flash,
+			get_node_or_null("Stage"), get_node_or_null("Backdrop")]:
+		if node != null:
+			node.visible = on
+	if on:
+		# 回到对局时恢复各组件的正常显隐规则
+		_set_final_hud(false)
+		if not _dialog_hidden_p3:
+			pass
+	if title_label != null:
+		title_label.visible = false
 
 
 func _show_title() -> void:
@@ -1486,6 +1561,10 @@ func _on_story_finished(_segment_id: String) -> void:
 ##   第二段游戏（act1_end 之后）          There's Something Outside
 ##   第三段游戏（act2_end 之后）          萍逢
 func _sync_bgm_for_act() -> void:
+	if phase == "menu":
+		if bgm_player != null:
+			bgm_player.play("res://audio/bgm/intro_circulation.mp3")
+		return
 	if bgm_player == null:
 		return
 	if story_seen.has(STORY_ACT2_END):
@@ -1526,6 +1605,8 @@ func _play_sentence_voice() -> void:
 # 打字音按"新增字符数"补音；输入法整句上屏时不会只响一声。
 
 var _last_input_length := 0
+## 主界面（开始游戏 / 设置 / 离开）
+var main_menu: Control = null
 ## 当前飘在画面上的句子节点（长句会拆成多行，所以是数组）
 var _curved_sentence_nodes: Array[Node2D] = []
 ## 对话框字格逐字浮现用的 tween
