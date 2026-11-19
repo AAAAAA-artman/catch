@@ -29,6 +29,13 @@ var _tween: Tween
 var _bg: TextureRect
 var _bg_path := ""
 var _bg_tween: Tween
+## 换图时的黑屏过渡层
+var _blackout: ColorRect
+## 4:3 相框（剧情里插入的照片）
+var _photo_frame: Panel
+var _photo: TextureRect
+var _photo_path := ""
+var _photo_anim: Tween
 var _dim: ColorRect
 var _panel: PanelContainer
 var _speaker: Label
@@ -73,6 +80,8 @@ func play(segment_id: String) -> void:
 		return
 	_segment_id = segment_id
 	_lines = segment.get("lines", [])
+	if _blackout != null:
+		_blackout.color = Color(0, 0, 0, 0)
 	var background: String = segment.get("background", "")
 	_bg_path = ""
 	if background != "":
@@ -83,6 +92,10 @@ func play(segment_id: String) -> void:
 	if _bg != null:
 		_bg.modulate = Color.WHITE
 	_index = -1
+	_reset_photo()
+	# 相框放在最后（盖在背景上、对话框下）
+	if _dim != null:
+		move_child(_photo_frame, _dim.get_index())
 	_playing = true
 	visible = true
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -105,6 +118,10 @@ func finish_now() -> void:
 	if not _playing:
 		return
 	_kill_tween()
+	if _blackout != null:
+		_blackout.color = Color(0, 0, 0, 0)
+	if _bg_tween != null and _bg_tween.is_valid():
+		_bg_tween.kill()
 	_playing = false
 	_typing = false
 	set_process(false)
@@ -123,6 +140,14 @@ func _kill_tween() -> void:
 
 
 ## 按行切换背景。路径没变就什么都不做，避免每行都重载。
+## 换图时的黑屏过渡时长
+const BLACKOUT_IN := 0.22
+const BLACKOUT_HOLD := 0.16
+const BLACKOUT_OUT := 0.30
+
+
+## 按行切换背景。路径没变就什么都不做，避免每行都重载。
+## 换图走一次「黑屏过渡」：淡到全黑 → 换图 → 淡回来，避免硬切突兀。
 func _apply_line_bg(path: String) -> void:
 	if path.is_empty() or path == _bg_path:
 		return
@@ -132,14 +157,65 @@ func _apply_line_bg(path: String) -> void:
 	var texture: Texture2D = load(path)
 	if texture == null:
 		return
-	_bg.texture = texture
-	_bg_path = path
-	# 短淡入，避免硬切
 	if _bg_tween != null and _bg_tween.is_valid():
 		_bg_tween.kill()
-	_bg.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	_blackout.color = Color(0, 0, 0, 0)
 	_bg_tween = create_tween()
-	_bg_tween.tween_property(_bg, "modulate:a", 1.0, 0.55)
+	_bg_tween.tween_property(_blackout, "color:a", 1.0, BLACKOUT_IN)
+	_bg_tween.tween_interval(BLACKOUT_HOLD)
+	_bg_tween.tween_callback(func() -> void:
+		_bg.texture = texture
+		_bg_path = path
+	)
+	_bg_tween.tween_property(_blackout, "color:a", 0.0, BLACKOUT_OUT)
+
+
+## 逐行照片：在 4:3 框里显示 / 收起
+func _apply_line_photo(path: String) -> void:
+	if path == _photo_path:
+		return
+	if path.is_empty():
+		_reset_photo()
+		return
+	if not ResourceLoader.exists(path):
+		push_warning("StoryOverlay: 照片不存在 %s" % path)
+		return
+	var texture: Texture2D = load(path)
+	if texture == null:
+		return
+	_photo.texture = texture
+	_photo_path = path
+	_layout_photo_frame()
+	if _photo_anim != null and _photo_anim.is_valid():
+		_photo_anim.kill()
+	_photo_frame.visible = true
+	_photo_frame.modulate = Color(1, 1, 1, 0)
+	_photo_anim = create_tween()
+	_photo_anim.tween_interval(BLACKOUT_IN + BLACKOUT_HOLD)
+	_photo_anim.tween_property(_photo_frame, "modulate:a", 1.0, 0.45)
+
+
+## 4:3 相框放在画面上半部中央（避开底部对话框）
+func _layout_photo_frame() -> void:
+	if _photo_frame == null:
+		return
+	var vp := get_viewport_rect().size
+	var h := vp.y * 0.68
+	var w := h * 4.0 / 3.0
+	if w > vp.x * 0.66:
+		w = vp.x * 0.66
+		h = w * 3.0 / 4.0
+	_photo_frame.position = Vector2((vp.x - w) * 0.5, vp.y * 0.04)
+	_photo_frame.size = Vector2(w, h)
+
+
+func _reset_photo() -> void:
+	_photo_path = ""
+	if _photo_anim != null and _photo_anim.is_valid():
+		_photo_anim.kill()
+	if _photo_frame != null:
+		_photo_frame.visible = false
+		_photo_frame.modulate = Color(1, 1, 1, 1)
 
 
 func _next_line() -> void:
@@ -148,8 +224,10 @@ func _next_line() -> void:
 		_finish()
 		return
 	var line: Dictionary = _lines[_index]
-	# 逐行背景：某一行写了 "bg" 就在这里换图（带一次短淡入）
+	# 逐行背景：某一行写了 "bg" 就在这里换图（走黑屏过渡）
 	_apply_line_bg(String(line.get("bg", "")))
+	# 逐行照片：某一行写了 "photo" 就在 4:3 框里显示这张图
+	_apply_line_photo(String(line.get("photo", "")))
 	var speaker: String = line.get("speaker", "")
 	_speaker.text = speaker
 	_speaker.visible = speaker != ""
@@ -175,6 +253,10 @@ func _advance() -> void:
 func _finish() -> void:
 	_playing = false
 	_typing = false
+	if _blackout != null:
+		_blackout.color = Color(0, 0, 0, 0)
+	if _bg_tween != null and _bg_tween.is_valid():
+		_bg_tween.kill()
 	set_process(false)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_kill_tween()
@@ -216,6 +298,38 @@ func _build_ui() -> void:
 	_bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_bg)
+
+	# 4:3 相框（默认隐藏）—— 和游戏里的画面框一样：黑底 + 黄色描边
+	_photo_frame = Panel.new()
+	_photo_frame.name = "PhotoFrame"
+	_photo_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_photo_frame.visible = false
+	var frame_style := StyleBoxFlat.new()
+	frame_style.bg_color = Color(0, 0, 0, 1)
+	frame_style.border_color = Color(1.0, 0.94, 0.0, 0.9)
+	frame_style.set_border_width_all(2)
+	_photo_frame.add_theme_stylebox_override("panel", frame_style)
+	add_child(_photo_frame)
+
+	_photo = TextureRect.new()
+	_photo.name = "Photo"
+	_photo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_photo.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_photo.offset_left = 2.0
+	_photo.offset_top = 2.0
+	_photo.offset_right = -2.0
+	_photo.offset_bottom = -2.0
+	_photo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_photo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_photo_frame.add_child(_photo)
+
+	# 黑屏过渡层：换背景 / 插照片时从这里过一下
+	_blackout = ColorRect.new()
+	_blackout.name = "Blackout"
+	_blackout.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_blackout.color = Color(0, 0, 0, 0)
+	_blackout.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_blackout)
 
 	# 压暗层：让底部对话框上的字更容易读
 	_dim = ColorRect.new()

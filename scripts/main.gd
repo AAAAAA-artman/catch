@@ -356,6 +356,7 @@ func _start_game(mode: String) -> void:
 	_dialog_home_rect = Rect2()
 	_dialog_hidden_p3 = false
 	_phase3_first_round = -1
+	_ending_muted = false
 	if tears_fx != null:
 		tears_fx.hide_now()
 	# 恢复对话框位置（上一局第三阶段可能把它移开了）
@@ -1148,6 +1149,15 @@ func _play_story(story_id: String) -> void:
 	_set_tension(false)
 	if voice_player != null:
 		voice_player.stop_all()
+	# 结尾剧情：把所有对局音效 / 环境音 / 心跳呼吸都停掉，只留 BGM
+	if story_id == STORY_EPILOGUE:
+		_ending_muted = true
+		if ambient != null:
+			ambient.stop_all()
+		if stress_audio != null:
+			stress_audio.stop_all()
+		if sfx_player != null:
+			sfx_player.stop_all()
 	if sfx_player != null:
 		# 只有"阶段满、要进剧情"时播好感音；开场 prologue 不算
 		if story_id != STORY_PROLOGUE:
@@ -1269,6 +1279,8 @@ var _dialog_home_rect := Rect2()
 var _dialog_hidden_p3 := false
 ## 第三阶段第一句的 round_number
 var _phase3_first_round := -1
+## 结尾剧情开始后：环境音 / 心跳呼吸全部静音
+var _ending_muted := false
 ## 面板原始背景样式（移到中央时换透明）
 var _dialog_home_style: StyleBox = null
 ## 父母合影闪现是否已触发过（一个阶段只触发一次）
@@ -1761,6 +1773,9 @@ func _update_ambient() -> void:
 	if ambient == null:
 		return
 	var in_game := phase in ["playing", "story", "won", "lost"]
+	# 结尾剧情开始后，环境音彻底停掉（包括胜利结算画面）
+	if _ending_muted:
+		in_game = false
 	ambient.update_state(_story_stage(), pressure, numbness, in_game)
 
 
@@ -1769,6 +1784,8 @@ func _update_stress_audio() -> void:
 	if stress_audio == null:
 		return
 	var in_game := phase in ["playing", "story", "won", "lost"]
+	if _ending_muted:
+		in_game = false
 	stress_audio.update_state(pressure, in_game)
 
 

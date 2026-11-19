@@ -11,7 +11,7 @@ extends Node
 ##
 ## 【偶发层】随机间隔响一下，不循环、不持续
 ##   3) 水滴（dripping.mp3）—— 第一、二阶段，偶尔一滴
-##   4) 飙车声（racing.mp3）—— 第一、二阶段，远远一辆车过去
+##   （飙车声已删除：与结尾的情绪不搭）
 ##
 ## 持续层用循环 + 音量平滑；偶发层用 one_shot 单次播放，
 ## 播完就停，等下一个随机间隔再响。
@@ -37,9 +37,10 @@ const DRIP_DB := -24.0
 const DRIP_GAP_MIN := 8.0
 const DRIP_GAP_MAX := 22.0
 
-## ---- 偶发：飙车声 ----
+## ---- 偶发：飙车声（已停用） ----
 ## 偶尔"呼"地冲过去一次，声音很大（近似正常音乐音量），
 ## 间隔约一分钟 —— 是突然的惊吓，不是背景底噪。
+const RACE_ENABLED := false   # 飙车音效已删除
 const RACE_DB := -3.0
 const RACE_GAP_MIN := 55.0
 const RACE_GAP_MAX := 75.0
@@ -171,11 +172,12 @@ func _process(delta: float) -> void:
 		_play_once(_dripping, DRIP_DB)
 		_drip_fired += 1
 
-	_race_countdown -= delta
-	if _race_countdown <= 0.0:
-		_reset_race()
-		_play_once(_racing, RACE_DB)
-		_race_fired += 1
+	if RACE_ENABLED:
+		_race_countdown -= delta
+		if _race_countdown <= 0.0:
+			_reset_race()
+			_play_once(_racing, RACE_DB)
+			_race_fired += 1
 
 
 ## 重置水滴的随机间隔

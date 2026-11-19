@@ -126,7 +126,7 @@ const SEGMENTS := {
 		],
 	},
 	"epilogue": {
-		"background": "res://art/story/p1_building.jpg",
+		"background": "res://art/story/e1_bedroom.jpg",
 		"bgm": "res://audio/bgm/pengfeng.mp3",
 		"lines": [
 			{"speaker": "", "text": "（窗帘并没有拉上，我被一条刺眼的阳光耀醒）"},
@@ -154,11 +154,11 @@ const SEGMENTS := {
 			{"speaker": "", "text": "可是…你们为什么不在了"},
 			{"speaker": "", "text": "（我发疯一般在屋里寻找，我想在家里再次找到他们的痕迹）"},
 			{"speaker": "", "text": "（我在餐桌的桌布下发现一张我们在大学门口的合照，那似乎是他们留下的少有的照片）"},
-			{"speaker": "", "text": "（他们的笑容在塑封的照片中永远凝固着）"},
+			{"photo": "res://art/story/e2_family.jpg", "speaker": "", "text": "（他们的笑容在塑封的照片中永远凝固着）"},
 			{"speaker": "", "text": "照片里的你们原来没有那么恐怖"},
 			{"speaker": "", "text": "（我拿起照片，正准备仔细看看，发现照片下面鼓鼓囊囊的，好像垫着什么东西）"},
 			{"speaker": "", "text": "这是…"},
-			{"speaker": "", "text": "（是一封信，署名日期是三年前）"},
+			{"photo": "", "speaker": "", "text": "（是一封信，署名日期是三年前）"},
 			{"speaker": "", "text": "（我双手颤抖着打开）"},
 			{"speaker": "父母", "text": "对不起，我的孩子，爸爸妈妈知道小时候亏欠你太多了"},
 			{"speaker": "父母", "text": "你现在和我们不亲了，我们也理解"},
