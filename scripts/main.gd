@@ -49,6 +49,10 @@ var current_sentence := ""
 var current_pinyin := PackedStringArray()
 var current_target := ""
 var last_sentence := ""
+## 当前句的说话人（father / mother，来自 sentence_data 的 speaker 标签）
+var current_speaker := ""
+## 当前句的语音长度类型（short / long / long_short / short_long）
+var current_voice_len := ""
 var input_mode := "hanzi"
 var records := {
 	"hanzi": {"best_score": 0, "best_speed": 0.0},
@@ -432,6 +436,8 @@ func _advance_sentence(message: String) -> void:
 		entry = _draw_sentence(current_kind)
 	current_sentence = entry["text"]
 	current_pinyin = PackedStringArray(entry["pinyin"])
+	current_speaker = String(entry.get("speaker", ""))
+	current_voice_len = String(entry.get("len", ""))
 	current_target = current_sentence if input_mode == "hanzi" else " ".join(current_pinyin)
 	last_sentence = current_sentence
 	# 限时跟着句子长度走：7 秒 + 每字 1.5 秒，后半段再收紧 15%
@@ -1292,14 +1298,20 @@ func _sync_bgm_for_act() -> void:
 
 
 func _sentence_speaker() -> String:
-	# 按句子内容查表（scripts/speaker_data.gd，172 句全部有归属）
+	# 优先用句子自带的 speaker 标签，没有才回退到按内容查表
+	if current_speaker != "":
+		return current_speaker
 	return SpeakerData.speaker_of(current_sentence)
 
 
 func _play_sentence_voice() -> void:
 	if voice_player == null or current_sentence.is_empty():
 		return
-	var started: bool = voice_player.play_for_sentence(current_sentence, _sentence_speaker())
+	var started: bool = false
+	if current_voice_len != "":
+		started = voice_player.play(current_voice_len, _sentence_speaker())
+	else:
+		started = voice_player.play_for_sentence(current_sentence, _sentence_speaker())
 	# 语音开始播放 -> 锁住输入，等它播完再放开
 	if started:
 		voice_waiting = true
@@ -1373,6 +1385,8 @@ func _advance_final_sentence(message: String) -> void:
 	current_kind = "positive"
 	current_sentence = String(entry["text"])
 	current_pinyin = PackedStringArray(entry["pinyin"])
+	current_speaker = String(entry.get("speaker", ""))
+	current_voice_len = String(entry.get("len", ""))
 	current_target = current_sentence if input_mode == "hanzi" else " ".join(current_pinyin)
 	last_sentence = current_sentence
 	# 不计时：给一个很大的值，UI 也已隐藏
