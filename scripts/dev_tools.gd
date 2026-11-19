@@ -11,6 +11,7 @@ extends Node
 ##   F7  麻木 +30（观察麻木条）
 ##   F8  重播当前剧情段（方便看台词排版）
 ##   F9  打印当前状态到输出
+##   F10 自动完美通过当前句（等同手打满分）  ⭐
 ##   F12 开/关"免死"（压力/麻木不会失败）
 ##
 ## 想关掉：把本节点 visible 设为 false，或直接删掉场景里的 Dev 节点。
@@ -68,6 +69,8 @@ func _input(event: InputEvent) -> void:
 			_dev_replay_story()
 		KEY_F9:
 			_dev_print_state()
+		KEY_F10:
+			_dev_auto_accept()
 		KEY_F12:
 			_game.debug_invincible = not bool(_game.debug_invincible)
 			print("[Dev] 免死 = ", _game.debug_invincible)
@@ -106,3 +109,25 @@ func _dev_print_state() -> void:
 	print("  剩余时间=", snappedf(_game.time_left, 0.1), "/", snappedf(_game.time_limit, 0.1))
 	print("  回合=", _game.round_number, "/", _game.MAX_ROUNDS)
 	print("  已播剧情=", _game.story_seen)
+
+
+## 自动完美通过当前句：直接把整句填进输入框并触发结算。
+## 用于跳过打字、快速推进剧情/数值，表现等价于"手打满分"。
+func _dev_auto_accept() -> void:
+	if _game.phase != "playing":
+		print("[Dev] 当前不在游戏中（phase=", _game.phase, "），无法自动通过")
+		return
+	var target: String = String(_game.current_target)
+	if target.is_empty():
+		print("[Dev] 没有当前句子")
+		return
+	# 清掉可能存在的语音锁 / 错误锁，避免结算被拦
+	_game.skip_voice_wait()
+	_game.input_lock_left = 0.0
+	_game.phrase_mistakes = 0
+	# 打满表现（速度给到参考值的 1.4 倍 → 单句好感接近上限）
+	_game.phrase_elapsed = maxf(float(target.length()) * 60.0 / (120.0 * 1.4), 0.3)
+	# 整句一次性写入并触发结算
+	_game.input_box.text = target
+	_game.input_box.text_changed.emit(target)
+	print("[Dev] 自动通过：", _game.current_sentence, " (好感 ", snappedf(_game.affection, 0.1), ")")
