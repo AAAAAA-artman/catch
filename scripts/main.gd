@@ -373,6 +373,8 @@ func _start_game(mode: String) -> void:
 	# 终章状态复位
 	_final_queue.clear()
 	_final_done = 0
+	_final_played = false
+	_final_finishing = false
 	_set_final_hud(false)
 	if tears_fx != null:
 		tears_fx.hide_now()
@@ -835,6 +837,10 @@ func _complete_sentence() -> void:
 		sfx_player.play_accept(current_kind, pressure, MAX_VALUE)
 	if _check_loss():
 		return
+	# 好感满：先打「终章 5 句」，打完才播结尾剧情 epilogue
+	if affection >= MAX_VALUE and not _final_played:
+		_start_final_phase()
+		return
 	if _start_story_chain(message):
 		return
 	_advance_sentence(message)
@@ -1261,8 +1267,8 @@ func _on_story_finished(_segment_id: String) -> void:
 			_advance_sentence(pending_message)
 			_sync_bgm_for_act()
 		"ending":
-			# 好感满、结局剧情演完 → 进入终章句子池；打完全部才算真正结束
-			_start_final_phase()
+			# 终章已打完、结尾剧情也演完 → 正式结束
+			_end_game(true)
 	story_resume = ""
 
 
@@ -1323,6 +1329,7 @@ var _cell_tween: Tween = null
 
 func _start_final_phase() -> void:
 	phase = "final"
+	_final_played = true
 	_final_queue = SentenceData.pool("final", "positive").duplicate()
 	_final_done = 0
 	_set_final_hud(true)
@@ -1410,10 +1417,16 @@ func _complete_final_sentence() -> void:
 	if sfx_player != null:
 		sfx_player.play_sentence_complete()
 	if _final_queue.is_empty():
+		if _final_finishing:
+			return
+		_final_finishing = true
 		state_label.text = "全部接住了"
 		_show_feedback("全部接住了。", Color("fff2c8"))
 		await get_tree().create_timer(1.1).timeout
-		_end_game(true)
+		# 终章打完 → 播结尾剧情 epilogue，它演完才真正结束
+		pending_message = ""
+		story_resume = "ending"
+		_play_story(STORY_EPILOGUE)
 		return
 	_show_feedback("接住了。", Color("f7d292"))
 	_advance_final_sentence("")
@@ -1454,7 +1467,11 @@ var _ending_muted := false
 var _p3_tears_level := 0.0
 ## 终章（好感满后的独立句子池）剩余句子
 var _final_queue: Array = []
-var _final_done := 0## 面板原始背景样式（移到中央时换透明）
+var _final_done := 0
+## 终章是否已经打过（决定 epilogue 的时机）
+var _final_played := false
+## 终章收尾是否已经开始（防重复触发）
+var _final_finishing := false## 面板原始背景样式（移到中央时换透明）
 var _dialog_home_style: StyleBox = null
 ## 父母合影闪现是否已触发过（一个阶段只触发一次）
 var _parents_flash_fired := false

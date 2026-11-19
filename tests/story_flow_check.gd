@@ -1,6 +1,6 @@
 extends SceneTree
-## 流程冒烟测试（headless）：标题 → prologue → 第一段游戏 → act1_intro/act1_end
-## → 第二段游戏 → act2_end → 第三段游戏 → epilogue → 结算
+## 流程冒烟测试（headless）：标题 → prologue → act1_intro → 第一段游戏
+## → act1_end → 第二段游戏 → act2_end → 第三段游戏 → 终章 5 句 → epilogue → 结算
 
 const EXPECT_ORDER := ["prologue", "act1_intro", "act1_end", "act2_end", "epilogue"]
 
@@ -31,9 +31,11 @@ func _initialize() -> void:
 	await _drain_stories("2/3 后")
 
 	# 第三段游戏 → 满（基准 6.5 × 0.6 也能到 100）
+	# 好感满后会先进「终章 5 句」，打完才播 epilogue
 	_push_to(100.0)
 	await _frames(4)
-	await _drain_stories("满值后")
+	await _drain_final()
+	await _drain_stories("终章后")
 
 	print("T9  最终 phase = ", game.phase, "（won 表示进结算）")
 	print("T10 剧情播放顺序 = ", seen_order)
@@ -62,6 +64,22 @@ func _push_to(value: float) -> void:
 	game._update_bars()
 	game._complete_sentence()
 	print("   好感度 → ", snappedf(game.affection, 0.1))
+
+
+## 打完终章句子池（好感满后的独立段）
+func _drain_final() -> void:
+	for guard in range(10):
+		if game.phase != "final":
+			return
+		game.skip_voice_wait()
+		var t: String = game.current_target
+		game.input_box.text = t
+		game.input_box.text_changed.emit(t)
+		for i in range(12):
+			await process_frame
+	# 最后一句打完有 1.1 秒延迟才播 epilogue，多等一会儿
+	for i in range(90):
+		await process_frame
 
 
 ## 把当前排队的所有剧情一次播完（连续段会依次触发）
