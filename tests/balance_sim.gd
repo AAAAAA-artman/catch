@@ -50,8 +50,13 @@ func _skip_all_story() -> void:
 	var ov: Control = game.get_node("StoryOverlay")
 	for guard in range(8):
 		if game.phase != "story":
-			return
+			break
 		ov.finish_now()
 		game.skip_voice_wait()
 		for i in range(10):
+			await process_frame
+	# 第一次进入游戏会弹操作说明，测试里直接关掉
+	if game.phase == "tutorial" and game.has_method("_close_tutorial"):
+		game._close_tutorial()
+		for i in range(8):
 			await process_frame
