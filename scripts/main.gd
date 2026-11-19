@@ -518,7 +518,9 @@ func _on_ending_finished() -> void:
 		_ending_tween.kill()
 	if _ending_layer != null:
 		_ending_layer.visible = false
-	_end_game(true)
+	_save_records()
+	# ED 播完 → 回主界面（而不是停在结算页）
+	_return_to_menu()
 
 
 ## 跳过 Ending
@@ -824,7 +826,6 @@ func _set_game_hud_visible(on: bool) -> void:
 			get_node_or_null("%StatsLabel"),
 			get_node_or_null("StatsBack"),
 			circle_fx, tears_fx, p3_tears,
-			mood_layer, phase2_room, phase3_gallery, parents_flash,
 			get_node_or_null("Stage"), get_node_or_null("Backdrop")]:
 		if node != null:
 			node.visible = on
@@ -833,6 +834,17 @@ func _set_game_hud_visible(on: bool) -> void:
 		_set_final_hud(false)
 		if not _dialog_hidden_p3:
 			pass
+	# 画面层（一/二/三阶段）由各自的状态机管，这里只在离开对局时统一收掉，
+	# 否则 _set_game_hud_visible(true) 会把二阶段房间强行打开
+	if not on:
+		if mood_layer != null:
+			mood_layer.set_active(false)
+		if phase2_room != null:
+			phase2_room.set_active(false)
+		if phase3_gallery != null:
+			phase3_gallery.reset()
+		if parents_flash != null:
+			parents_flash.stop_flash()
 	if title_label != null:
 		title_label.visible = false
 
@@ -1511,9 +1523,11 @@ func _complete_sentence() -> void:
 		pressure = minf(MAX_VALUE, pressure + dp)
 	else:
 		pressure = maxf(0.0, pressure + dp)
-	# 明显负面（1/2 档）才涌上泪水
-	if current_tier <= 2:
-		_play_tears()
+	# 负面句才涌上泪水；坏2（tier1）最重，坏1（tier2）弱一些
+	if current_tier == 1:
+		_play_tears(1.0)
+	elif current_tier == 2:
+		_play_tears(0.55)
 	_fade_out_curved_sentence()
 	_update_bars()
 	_save_records()
@@ -1541,10 +1555,10 @@ func _complete_sentence() -> void:
 
 ## 负面句结算时叠一层泪水滤镜。强度跟压力挂钩：
 ## 压力越高，泪越重（25% ~ 100%）。
-func _play_tears() -> void:
+func _play_tears(scale: float = 1.0) -> void:
 	if tears_fx == null:
 		return
-	var intensity := lerpf(0.55, 1.0, clampf(pressure / MAX_VALUE, 0.0, 1.0))
+	var intensity := lerpf(0.55, 1.0, clampf(pressure / MAX_VALUE, 0.0, 1.0)) * scale
 	tears_fx.play(intensity)
 
 

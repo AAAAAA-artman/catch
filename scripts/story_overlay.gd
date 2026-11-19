@@ -36,6 +36,10 @@ var _photo_frame: Panel
 var _photo: TextureRect
 var _photo_path := ""
 var _photo_anim: Tween
+## 「信」的竖排呈现（epilogue 里的父母台词）
+var _letter_layer: Control = null
+var _letter_labels: Array = []
+var _letter_started := false
 var _dim: ColorRect
 var _panel: PanelContainer
 var _speaker: Label
@@ -93,6 +97,7 @@ func play(segment_id: String) -> void:
 		_bg.modulate = Color.WHITE
 	_index = -1
 	_reset_photo()
+	_clear_letter()
 	# 相框放在最后（盖在背景上、对话框下）
 	if _dim != null:
 		move_child(_photo_frame, _dim.get_index())
@@ -140,6 +145,81 @@ func _kill_tween() -> void:
 
 
 ## 按行切换背景。路径没变就什么都不做，避免每行都重载。
+## 清掉「信」的竖排文字
+func _clear_letter() -> void:
+	_letter_started = false
+	_letter_labels.clear()
+	if _letter_layer != null:
+		_letter_layer.visible = false
+		for c in _letter_layer.get_children():
+			if c.name == "Scrim":
+				continue
+			c.queue_free()
+
+
+## epilogue 的「父母」台词 = 那封信：竖排显示，最新一行在最下方，旧行往上推
+func _update_letter_for_line(line: Dictionary) -> void:
+	if _letter_layer == null:
+		return
+	var speaker := String(line.get("speaker", ""))
+	var text := String(line.get("text", ""))
+	var is_letter: bool = _segment_id == "epilogue" and speaker == "父母"
+	if is_letter:
+		_letter_started = true
+		_add_letter_line(text)
+		# 信期间不显示底部对话框
+		if _panel != null:
+			_panel.visible = false
+	elif _letter_started:
+		# 信之后的旁白：底部对话框回来，信留在背后
+		if _panel != null:
+			_panel.visible = true
+
+
+func _add_letter_line(text: String) -> void:
+	var vp := get_viewport_rect().size
+	var font := _letter_font()
+	var fs := 26
+	var line_h := 48.0
+	var col_w := vp.x * 0.62
+	var label := Label.new()
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if font != null:
+		label.add_theme_font_override("font", font)
+	label.add_theme_font_size_override("font_size", fs)
+	# 越早的行越淡，最新的最亮
+	label.add_theme_color_override("font_color", Color(0.95, 0.94, 0.90, 0.95))
+	label.size = Vector2(col_w, line_h)
+	_letter_layer.add_child(label)
+	_letter_labels.append(label)
+	_relayout_letter(vp, col_w, line_h)
+	_letter_layer.visible = true
+
+
+## 最新一行固定在屏幕 72% 高度，其余向上排
+func _relayout_letter(vp: Vector2, col_w: float, line_h: float) -> void:
+	var n := _letter_labels.size()
+	var base_y: float = vp.y * 0.72
+	var col_x := (vp.x - col_w) * 0.5
+	for i in range(n):
+		var l: Label = _letter_labels[i]
+		l.position = Vector2(col_x, base_y - float(n - 1 - i) * line_h)
+		# 越旧越淡
+		var age := float(n - 1 - i)
+		l.add_theme_color_override("font_color",
+			Color(0.95, 0.94, 0.90, clampf(0.95 - age * 0.08, 0.25, 0.95)))
+
+
+func _letter_font() -> Font:
+	var p := "res://fonts/nanodasong.ttf"
+	if ResourceLoader.exists(p):
+		return load(p)
+	return null
+
+
 ## 换图时的黑屏过渡时长
 const BLACKOUT_IN := 0.22
 const BLACKOUT_HOLD := 0.16
@@ -224,6 +304,8 @@ func _next_line() -> void:
 		_finish()
 		return
 	var line: Dictionary = _lines[_index]
+	# epilogue 里父母说的那封信：竖排堆叠呈现，不用底部对话框
+	_update_letter_for_line(line)
 	# 逐行背景：某一行写了 "bg" 就在这里换图（走黑屏过渡）
 	_apply_line_bg(String(line.get("bg", "")))
 	# 逐行照片：某一行写了 "photo" 就在 4:3 框里显示这张图
@@ -322,6 +404,22 @@ func _build_ui() -> void:
 	_photo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_photo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	_photo_frame.add_child(_photo)
+
+	# 「信」层：竖排白字，逐行向上堆叠（类似 ED）
+	_letter_layer = Control.new()
+	_letter_layer.name = "Letter"
+	_letter_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_letter_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_letter_layer.visible = false
+	add_child(_letter_layer)
+
+	# 暗底：信是白字，压在照片上必须压暗才能读
+	var letter_scrim := ColorRect.new()
+	letter_scrim.name = "Scrim"
+	letter_scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	letter_scrim.color = Color(0.0, 0.0, 0.0, 0.55)
+	letter_scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_letter_layer.add_child(letter_scrim)
 
 	# 黑屏过渡层：换背景 / 插照片时从这里过一下
 	_blackout = ColorRect.new()
