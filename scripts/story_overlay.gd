@@ -27,6 +27,8 @@ var _fast_forward_elapsed := 0.0
 var _tween: Tween
 
 var _bg: TextureRect
+var _bg_path := ""
+var _bg_tween: Tween
 var _dim: ColorRect
 var _panel: PanelContainer
 var _speaker: Label
@@ -72,10 +74,14 @@ func play(segment_id: String) -> void:
 	_segment_id = segment_id
 	_lines = segment.get("lines", [])
 	var background: String = segment.get("background", "")
+	_bg_path = ""
 	if background != "":
 		var texture: Texture2D = load(background)
 		if texture != null:
 			_bg.texture = texture
+			_bg_path = background
+	if _bg != null:
+		_bg.modulate = Color.WHITE
 	_index = -1
 	_playing = true
 	visible = true
@@ -116,12 +122,34 @@ func _kill_tween() -> void:
 	_tween = null
 
 
+## 按行切换背景。路径没变就什么都不做，避免每行都重载。
+func _apply_line_bg(path: String) -> void:
+	if path.is_empty() or path == _bg_path:
+		return
+	if not ResourceLoader.exists(path):
+		push_warning("StoryOverlay: 背景不存在 %s" % path)
+		return
+	var texture: Texture2D = load(path)
+	if texture == null:
+		return
+	_bg.texture = texture
+	_bg_path = path
+	# 短淡入，避免硬切
+	if _bg_tween != null and _bg_tween.is_valid():
+		_bg_tween.kill()
+	_bg.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	_bg_tween = create_tween()
+	_bg_tween.tween_property(_bg, "modulate:a", 1.0, 0.55)
+
+
 func _next_line() -> void:
 	_index += 1
 	if _index >= _lines.size():
 		_finish()
 		return
 	var line: Dictionary = _lines[_index]
+	# 逐行背景：某一行写了 "bg" 就在这里换图（带一次短淡入）
+	_apply_line_bg(String(line.get("bg", "")))
 	var speaker: String = line.get("speaker", "")
 	_speaker.text = speaker
 	_speaker.visible = speaker != ""

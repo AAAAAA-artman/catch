@@ -25,10 +25,10 @@ extends RefCounted
 
 const SEGMENTS := {
 	"prologue": {
-		"background": "res://art/story/room_clean.png",
+		"background": "res://art/story/p1_building.jpg",
 		"bgm": "res://audio/bgm/intro_circulation.mp3",
 		"lines": [
-			{"speaker": "", "text": "我今天回家了"},
+			{"bg": "res://art/story/p1_building.jpg", "speaker": "", "text": "我今天回家了"},
 			{"speaker": "", "text": "从工作的城市赶回了老家"},
 			{"speaker": "", "text": "拢共八个小时的路程让我精疲力竭，出租车终于停下来了"},
 			{"speaker": "", "text": "到家了"},
@@ -36,11 +36,11 @@ const SEGMENTS := {
 			{"speaker": "", "text": "感觉好像是某个放学回家的下午，即使我明明已经离开很长时间了。"},
 			{"speaker": "", "text": "我上次回家是什么时候来着…？"},
 			{"speaker": "", "text": "（上楼）"},
-			{"speaker": "", "text": "今年贴的对联已经驳落一半了，依稀能看出横批是“马到成功”"},
+			{"bg": "res://art/story/p2_stairs.jpg", "speaker": "", "text": "今年贴的对联已经驳落一半了，依稀能看出横批是“马到成功”"},
 			{"speaker": "", "text": "好像只有对联换过了，我记得上次走的时候，这个横批是“虎年大吉”"},
 			{"speaker": "", "text": "（我习惯性地摸了摸口袋后楞了一会儿，从包里拿出来了一串黄铜钥匙。）"},
 			{"speaker": "", "text": "好像是往这边拧……"},
-			{"speaker": "", "text": "咳咳……味道怎么这么大"},
+			{"bg": "res://art/story/p3_living.jpg", "speaker": "", "text": "咳咳……味道怎么这么大"},
 			{"speaker": "", "text": "（跨进门槛，我注意没有让自己的脏鞋踩到母亲不久前还经常打扫的地板）"},
 			{"speaker": "", "text": "（我嗅到了一股家里常年有的霉味，大脑闪过一些模糊的画面）"},
 			{"speaker": "", "text": "怎么感觉有点头晕。"},
@@ -49,7 +49,7 @@ const SEGMENTS := {
 			{"speaker": "", "text": "昨天母亲刚过世，这次我只能回来了，他们走的时候我都不在老家，自然也没见到他们最后一面。"},
 			{"speaker": "", "text": "我也说不清自己是因为真的太忙了才一直没有回家，还是因为我其实不太想见到他们。"},
 			{"speaker": "", "text": "或许是我不孝吧……每次看见他们，回到这个家，都让我有些紧张不安。"},
-			{"speaker": "", "text": "（把换下的鞋整整齐齐地摆在门口，轻手轻脚地走进卧室）"},
+			{"bg": "res://art/story/p4_bedroom.jpg", "speaker": "", "text": "（把换下的鞋整整齐齐地摆在门口，轻手轻脚地走进卧室）"},
 			{"speaker": "", "text": "（房间和我记忆中一模一样，只是书柜和书桌上已经落了一层薄灰了）"},
 			{"speaker": "", "text": "（缓缓坐在床上）"},
 			{"speaker": "", "text": "不知是疲劳还是家的味道让我想起了什么"},
@@ -70,10 +70,10 @@ const SEGMENTS := {
 		],
 	},
 	"act1_intro": {
-		"background": "res://art/story/door_black.png",
+		"background": "res://art/story/p5_dream.jpg",
 		"bgm": "res://audio/bgm/dream_street.mp3",
 		"lines": [
-			{"speaker": "", "text": "父母的声音突然出现在我的耳边"},
+			{"bg": "res://art/story/p5_dream.jpg", "speaker": "", "text": "父母的声音突然出现在我的耳边"},
 			{"speaker": "", "text": "谁在说话…你们怎么在这里"},
 			{"speaker": "", "text": "好黑......怎么了，家里怎么有奇怪的声音"},
 			{"speaker": "", "text": "我睡到晚上了吗？"},
@@ -81,10 +81,10 @@ const SEGMENTS := {
 		],
 	},
 	"act1_end": {
-		"background": "res://art/story/door_dark.png",
+		"background": "res://art/story/p6_dark.jpg",
 		"bgm": "res://audio/bgm/something_outside.mp3",
 		"lines": [
-			{"speaker": "父母", "text": "这孩子怎么还没起"},
+			{"bg": "res://art/story/p6_dark.jpg", "speaker": "父母", "text": "这孩子怎么还没起"},
 			{"speaker": "父母", "text": "你去看看她是不是又把门锁住了"},
 			{"speaker": "父母", "text": "饭都快放凉了"},
 			{"speaker": "父母", "text": "昨天晚上肯定又不知道几点睡的"},
@@ -93,7 +93,7 @@ const SEGMENTS := {
 			{"speaker": "", "text": "房间越来越黑了"},
 			{"speaker": "父母", "text": "都说多少遍了不要关门，她老是不听"},
 			{"speaker": "父母", "text": "就是啊。"},
-			{"speaker": "", "text": "锈迹斑斑的铁门吱呀一声被推到墙上，发出一声巨响"},
+			{"bg": "res://art/story/p7_monster.jpg", "speaker": "", "text": "锈迹斑斑的铁门吱呀一声被推到墙上，发出一声巨响"},
 			{"speaker": "", "text": "漆黑的门后出现的是一个我闻所未闻的怪物"},
 			{"speaker": "", "text": "……"},
 			{"speaker": "", "text": "啊！"},
@@ -126,7 +126,7 @@ const SEGMENTS := {
 		],
 	},
 	"epilogue": {
-		"background": "res://art/story/room_clean.png",
+		"background": "res://art/story/p1_building.jpg",
 		"bgm": "res://audio/bgm/pengfeng.mp3",
 		"lines": [
 			{"speaker": "", "text": "（窗帘并没有拉上，我被一条刺眼的阳光耀醒）"},
