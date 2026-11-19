@@ -13,6 +13,8 @@ signal finished(segment_id: String)
 
 const TYPE_SPEED := 38.0   ## 每秒显示多少字
 const FADE_TIME := 0.45
+const FAST_FORWARD_INTERVAL := 0.15
+const ADVANCE_HINT := "空格 / 回车 / 点击 继续　·　按住 Ctrl 快进"
 
 var _lines: Array = []
 var _index := -1
@@ -21,6 +23,7 @@ var _full_text := ""
 var _typing := false
 var _playing := false
 var _shown := 0.0
+var _fast_forward_elapsed := 0.0
 var _tween: Tween
 
 var _bg: TextureRect
@@ -38,14 +41,24 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if not _playing or not _typing:
+	if not _playing:
+		return
+	if Input.is_key_pressed(KEY_CTRL):
+		if _typing:
+			_advance()
+		_fast_forward_elapsed += delta
+		if _fast_forward_elapsed >= FAST_FORWARD_INTERVAL:
+			_next_line()
+		return
+	_fast_forward_elapsed = 0.0
+	if not _typing:
 		return
 	_shown += TYPE_SPEED * delta
 	var count := mini(int(_shown), _full_text.length())
 	_text.text = _full_text.substr(0, count)
 	if count >= _full_text.length():
 		_typing = false
-		_hint.text = "空格 / 回车 / 点击 继续"
+		_hint.text = ADVANCE_HINT
 
 
 ## 播放一段剧情。segment_id 见 StoryData.SEGMENTS。
@@ -115,8 +128,9 @@ func _next_line() -> void:
 	_full_text = line.get("text", "")
 	_text.text = ""
 	_shown = 0.0
+	_fast_forward_elapsed = 0.0
 	_typing = true
-	_hint.text = ""
+	_hint.text = "按住 Ctrl 快进"
 
 
 func _advance() -> void:
@@ -125,7 +139,7 @@ func _advance() -> void:
 		_shown = float(_full_text.length())
 		_text.text = _full_text
 		_typing = false
-		_hint.text = "空格 / 回车 / 点击 继续"
+		_hint.text = ADVANCE_HINT
 		return
 	_next_line()
 
