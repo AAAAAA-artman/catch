@@ -29,7 +29,6 @@ const POOLS := {
 		],
 		"positive": [
 			{"text": "上次去你表姐家人家孩子都上幼儿园了", "pinyin": ["shang", "ci", "qu", "ni", "biao", "jie", "jia", "ren", "jia", "hai", "zi", "dou", "shang", "you", "er", "yuan", "le"], "speaker": "mother", "len": "short_long"},
-			{"text": "妈妈今天出门看到一个衣服很适合你", "pinyin": ["ma", "ma", "jin", "tian", "chu", "men", "kan", "dao", "yi", "ge", "yi", "fu", "hen", "shi", "he", "ni"], "speaker": "mother", "len": "long"},
 			{"text": "发的工资好好攒着以后要用不要乱花", "pinyin": ["fa", "de", "gong", "zi", "hao", "hao", "zan", "zhe", "yi", "hou", "yao", "yong", "bu", "yao", "luan", "hua"], "speaker": "father", "len": "long_short"},
 			{"text": "咳咳咳都是小毛病", "pinyin": ["hai", "hai", "ke", "dou", "shi", "xiao", "mao", "bing"], "speaker": "mother", "len": "short"},
 			{"text": "我们知道你忙没时间给家里打电话", "pinyin": ["wo", "men", "zhi", "dao", "ni", "mang", "mei", "shi", "jian", "gei", "jia", "li", "da", "dian", "hua"], "speaker": "mother", "len": "short_long"},
@@ -71,7 +70,6 @@ const POOLS := {
 			{"text": "不要把门关上", "pinyin": ["bu", "yao", "ba", "men", "guan", "shang"], "speaker": "father", "len": "short"},
 			{"text": "一进屋就看见你房间关着个门难看死了", "pinyin": ["yi", "jin", "wu", "jiu", "kan", "jian", "ni", "fang", "jian", "guan", "zhe", "ge", "men", "nan", "kan", "si", "le"], "speaker": "mother", "len": "short"},
 			{"text": "做完作业洗手去摸了本子脏", "pinyin": ["zuo", "wan", "zuo", "ye", "xi", "shou", "qu", "mo", "le", "ben", "zi", "zang"], "speaker": "father", "len": "long_short"},
-			{"text": "我说了一个小时做完你看看你写了多少才", "pinyin": ["wo", "shuo", "le", "yi", "ge", "xiao", "shi", "zuo", "wan", "ni", "kan", "kan", "ni", "xie", "le", "duo", "shao", "cai"], "speaker": "mother", "len": "long"},
 			{"text": "你的被子我洗好换新的了", "pinyin": ["ni", "de", "bei", "zi", "wo", "xi", "hao", "huan", "xin", "de", "le"], "speaker": "mother", "len": "short"},
 			{"text": "去学校记得拿饭", "pinyin": ["qu", "xue", "xiao", "ji", "de", "na", "fan"], "speaker": "mother", "len": "short"},
 			{"text": "说了多少次了吃东西前要洗手", "pinyin": ["shuo", "le", "duo", "shao", "ci", "le", "chi", "dong", "xi", "qian", "yao", "xi", "shou"], "speaker": "mother", "len": "short"},

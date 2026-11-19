@@ -92,12 +92,10 @@ const POOLS := {
 	],
 	"long": [
 		{"text": "你上次一起去吃饭的那个男的长得还可以", "pinyin": ["ni", "shang", "ci", "yi", "qi", "qu", "chi", "fan", "de", "na", "ge", "nan", "de", "zhang", "de", "hai", "ke", "yi"]},
-		{"text": "妈妈今天出门看到一个衣服很适合你", "pinyin": ["ma", "ma", "jin", "tian", "chu", "men", "kan", "dao", "yi", "ge", "yi", "fu", "hen", "shi", "he", "ni"]},
 		{"text": "不是非让你结婚是怕我们走了以后你怎么办", "pinyin": ["bu", "shi", "fei", "rang", "ni", "jie", "hun", "shi", "pa", "wo", "men", "zou", "le", "yi", "hou", "ni", "zen", "me", "ban"]},
 		{"text": "裤子穿厚点别和你爸一样老寒腿一天尽受罪", "pinyin": ["ku", "zi", "chuan", "hou", "dian", "bie", "he", "ni", "ba", "yi", "yang", "lao", "han", "tui", "yi", "tian", "jin", "shou", "zui"]},
 		{"text": "听你二姑说隔壁村有一个和你差不多大的", "pinyin": ["ting", "ni", "er", "gu", "shuo", "ge", "bi", "cun", "you", "yi", "ge", "he", "ni", "cha", "bu", "duo", "da", "de"]},
 		{"text": "一天天就不让我们省心小时候就是", "pinyin": ["yi", "tian", "tian", "jiu", "bu", "rang", "wo", "men", "sheng", "xin", "xiao", "shi", "hou", "jiu", "shi"]},
-		{"text": "我说了一个小时做完你看看你写了多少才", "pinyin": ["wo", "shuo", "le", "yi", "ge", "xiao", "shi", "zuo", "wan", "ni", "kan", "kan", "ni", "xie", "le", "duo", "shao", "cai"]},
 		{"text": "吃饭的时候坐端正狼吞虎咽的没一点女孩样", "pinyin": ["chi", "fan", "de", "shi", "hou", "zuo", "duan", "zheng", "lang", "tun", "hu", "yan", "de", "mei", "yi", "dian", "nv", "hai", "yang"]},
 		{"text": "以后和表弟表妹玩的时候让着点他们", "pinyin": ["yi", "hou", "he", "biao", "di", "biao", "mei", "wan", "de", "shi", "hou", "rang", "zhe", "dian", "ta", "men"]},
 		{"text": "唉你说你怎么不像你表姐那么聪明", "pinyin": ["ai", "ni", "shuo", "ni", "zen", "me", "bu", "xiang", "ni", "biao", "jie", "na", "me", "cong", "ming"]},

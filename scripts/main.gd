@@ -60,7 +60,12 @@ var records := {
 }
 var rng := RandomNumberGenerator.new()
 var kind_deck: Array[String] = []
-var sentence_bags := {}
+## 抽取状态：已经抽过的句子 "phase:kind" -> Array[String]
+var _used_texts := {}
+## 当前连续同类型句数
+var _kind_run := 0
+## 上一句的类型
+var _last_kind := ""
 
 @onready var title_label: Label = %TitleLabel
 @onready var state_label: Label = %StateLabel
@@ -152,6 +157,20 @@ var debug_invincible := false
 const TENSION_RATIO := 0.3
 ## 第三阶段：每接受一句话，泪水强度涨多少（模拟逐渐流泪）
 const P3_TEARS_STEP := 0.135
+## 每个阶段开头固定播放的句子（key = round_number）
+##   第一段：1「你什么时候回来的」→ 2「房门别关上啊」
+##   第二段：11「不要把门关上」→ 12「一进屋就看见你房间关着个门难看死了」
+##   第三段：21「门开着吧要不都看不见你」
+const OPENERS := {
+	1: "你什么时候回来的",
+	2: "房门别关上啊",
+	11: "不要把门关上",
+	12: "一进屋就看见你房间关着个门难看死了",
+	21: "门开着吧要不都看不见你",
+}
+## 同类型句子连续抽取的硬上限（坏句可能致死，只允许连续 2 次）
+const MAX_RUN := {"neutral": 4, "positive": 4, "negative": 2}
+
 const P3_TEARS_MAX := 0.95
 
 
@@ -402,8 +421,7 @@ func _start_game(mode: String) -> void:
 	_voice_wait_elapsed = 0.0
 	has_started_typing = false
 	last_sentence = ""
-	_build_kind_deck()
-	sentence_bags.clear()
+	_reset_draw_state()
 	input_box.editable = false
 	_update_bars()
 	_clear_curved_text()
@@ -425,15 +443,24 @@ func _advance_sentence(message: String) -> void:
 	# 登记第三阶段第一句的句号，供布局切换判定
 	if _story_stage() == 3 and _phase3_first_round < 0:
 		_phase3_first_round = round_number
-	current_kind = kind_deck[round_number - 1]
-	# 闪现触发后，接下来几句改成从"偷听到的"好句子池抽
-	var entry: Dictionary
-	if _is_special_sentence():
-		entry = _draw_overheard()
-		if not entry.is_empty():
-			current_kind = "positive"
-	if entry.is_empty() or not entry.has("text"):
-		entry = _draw_sentence(current_kind)
+	# 阶段开头的固定句优先（按顺序播）
+	var entry: Dictionary = _opener_entry(round_number)
+	if not entry.is_empty():
+		current_kind = "neutral"
+		if current_kind == _last_kind:
+			_kind_run += 1
+		else:
+			_kind_run = 1
+			_last_kind = current_kind
+	else:
+		# 闪现触发后，接下来几句改成从"偷听到的"好句子池抽
+		if _is_special_sentence():
+			entry = _draw_overheard()
+			if not entry.is_empty():
+				current_kind = "positive"
+		if entry.is_empty() or not entry.has("text"):
+			current_kind = _pick_next_kind()
+			entry = _draw_sentence(current_kind)
 	current_sentence = entry["text"]
 	current_pinyin = PackedStringArray(entry["pinyin"])
 	current_speaker = String(entry.get("speaker", ""))
@@ -497,16 +524,101 @@ func _advance_sentence(message: String) -> void:
 
 ## 每个阶段 10 句的句子类型牌堆。
 ## 越往后负面句越多（压力感递增），但每阶段都保证有正面句，不至于一路挨骂。
-func _build_kind_deck() -> void:
-	var stage1: Array[String] = ["neutral", "neutral", "neutral", "neutral", "neutral", "neutral", "positive", "positive", "negative", "negative"]
-	var stage2: Array[String] = ["neutral", "neutral", "neutral", "neutral", "neutral", "positive", "positive", "negative", "negative", "negative"]
-	var stage3: Array[String] = ["neutral", "neutral", "neutral", "neutral", "positive", "positive", "negative", "negative", "negative", "negative"]
-	_shuffle(stage1)
-	_shuffle(stage2)
-	_shuffle(stage3)
-	kind_deck = stage1
-	kind_deck.append_array(stage2)
-	kind_deck.append_array(stage3)
+## 重置抽取状态（开局调用）
+func _reset_draw_state() -> void:
+	_used_texts.clear()
+	_kind_run = 0
+	_last_kind = ""
+
+
+func _used_key(phase: String, kind: String) -> String:
+	return phase + ":" + kind
+
+
+## 某阶段某类型里还没被抽过的句子
+func _remaining_pool(phase: String, kind: String) -> Array:
+	var all: Array = SentenceData.pool(phase, kind)
+	if all.is_empty():
+		return []
+	var used: Array = _used_texts.get(_used_key(phase, kind), [])
+	var out: Array = []
+	for e in all:
+		if not used.has(String(e["text"])):
+			out.append(e)
+	return out
+
+
+## 按权重选下一句的类型。
+##   · 连续抽到同一类型时，其他类型的权重逐步提高（最多压到 0.12 / 抬到约 2.5 倍）
+##   · 硬上限：坏句最多连续 2 次（可能致死），其余最多 4 次
+func _pick_next_kind() -> String:
+	var kinds: Array[String] = ["neutral", "positive", "negative"]
+	var phase := _sentence_phase()
+	var remain := {}
+	var total_left := 0
+	for k in kinds:
+		var n := _remaining_pool(phase, k).size()
+		if n == 0:
+			# 该池抽完了 → 清掉已用记录，允许重新抽
+			_used_texts.erase(_used_key(phase, k))
+			n = SentenceData.pool(phase, k).size()
+		remain[k] = n
+		total_left += n
+	if total_left <= 0:
+		return "neutral"
+
+	var w := {"neutral": 5.0, "positive": 2.5, "negative": 2.5}
+	if _last_kind != "" and _kind_run >= 1:
+		var run_f := float(_kind_run)
+		for k in kinds:
+			if k == _last_kind:
+				w[k] *= maxf(0.12, 1.0 - 0.35 * run_f)
+			else:
+				w[k] *= 1.0 + 0.50 * run_f
+
+	# 硬上限
+	if _last_kind != "":
+		var cap: int = int(MAX_RUN.get(_last_kind, 4))
+		if _kind_run >= cap:
+			w[_last_kind] = 0.0
+
+	var total := 0.0
+	for k in kinds:
+		if int(remain[k]) <= 0:
+			w[k] = 0.0
+		total += float(w[k])
+	if total <= 0.0:
+		for k in kinds:
+			if int(remain[k]) > 0:
+				return k
+		return "neutral"
+
+	var roll := rng.randf() * total
+	for k in kinds:
+		roll -= float(w[k])
+		if roll <= 0.0:
+			return k
+	return "neutral"
+
+
+## 取阶段开头的固定句（找不到就返回空字典，退回随机）
+func _opener_entry(n: int) -> Dictionary:
+	if not OPENERS.has(n):
+		return {}
+	var want: String = OPENERS[n]
+	var phase := _sentence_phase()
+	for k in ["neutral", "positive", "negative"]:
+		for e in SentenceData.pool(phase, k):
+			if String(e["text"]) == want:
+				return e
+	# 模糊：包含关系（文档标点/错字可能导致不完全一致）
+	for k in ["neutral", "positive", "negative"]:
+		for e in SentenceData.pool(phase, k):
+			var t := String(e["text"])
+			if t.contains(want) or want.contains(t):
+				return e
+	push_warning("Main: 固定开头句找不到 -> %s" % want)
+	return {}
 
 
 func _shuffle(items: Array) -> void:
@@ -517,28 +629,53 @@ func _shuffle(items: Array) -> void:
 		items[other] = saved
 
 
+## 当前句子池所属阶段。
+## 【重要】按句数（round_number）判定，不按好感阈值 ——
+## 和阶段画面 / 剧情触发 / 同心圆保持一致，否则会出现
+## "阶段已切换但句子池还是旧的"（好感可能因打字快慢提前或延后跨阈值）。
 func _sentence_phase() -> String:
-	if affection >= STORY_MID_2:
-		return "phase3"
-	if affection >= STORY_MID_1:
-		return "phase2"
-	return "phase1"
+	var idx := clampi((round_number - 1) / ROUNDS_PER_STAGE, 0, STAGE_COUNT - 1)
+	match idx:
+		0:
+			return "phase1"
+		1:
+			return "phase2"
+		_:
+			return "phase3"
 
 
+## 抽一句指定类型的句子：抽过的不会再抽到
 func _draw_sentence(kind: String) -> Dictionary:
 	var phase := _sentence_phase()
-	var bag_key := phase + ":" + kind
-	if not sentence_bags.has(bag_key) or sentence_bags[bag_key].is_empty():
-		var bag: Array = SentenceData.pool(phase, kind).duplicate()
-		if bag.is_empty():
-			bag = SentenceData.pool("phase1", kind).duplicate()
-		_shuffle(bag)
-		sentence_bags[bag_key] = bag
-	var options: Array = sentence_bags[bag_key]
-	if options.size() > 1 and options.back()["text"] == last_sentence:
-		var first = options.pop_front()
-		options.push_back(first)
-	return options.pop_back()
+	var options := _remaining_pool(phase, kind)
+	if options.is_empty():
+		_used_texts.erase(_used_key(phase, kind))
+		options = SentenceData.pool(phase, kind).duplicate()
+	if options.is_empty():
+		options = SentenceData.pool("phase1", kind).duplicate()
+	if options.is_empty():
+		return {}
+	# 避免和上一句完全相同
+	if options.size() > 1:
+		var filtered: Array = []
+		for e in options:
+			if String(e["text"]) != last_sentence:
+				filtered.append(e)
+		if not filtered.is_empty():
+			options = filtered
+
+	var pick: Dictionary = options[rng.randi() % options.size()]
+	var used: Array = _used_texts.get(_used_key(phase, kind), [])
+	used.append(String(pick["text"]))
+	_used_texts[_used_key(phase, kind)] = used
+
+	# 记录连续同类型
+	if kind == _last_kind:
+		_kind_run += 1
+	else:
+		_kind_run = 1
+		_last_kind = kind
+	return pick
 
 
 ## 句子变长后按长度缩字号，保证整句在一行里放得下（原设计固定 34/25）。
