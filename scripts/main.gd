@@ -354,6 +354,11 @@ func _start_game(mode: String) -> void:
 		phase3_gallery.reset()
 	if tears_fx != null:
 		tears_fx.hide_now()
+	# 恢复对话框位置（上一局第三阶段可能把它移开了）
+	if _dialog_swing_tween != null and _dialog_swing_tween.is_valid():
+		_dialog_swing_tween.kill()
+	if hud_layout != null:
+		hud_layout.call_deferred("_apply_all")
 	if ambient != null:
 		ambient.stop_all()
 	if stress_audio != null:
@@ -442,6 +447,10 @@ func _advance_sentence(message: String) -> void:
 	_refresh_stats()
 	if hud_layout != null:
 		hud_layout.call_deferred("_apply_all")
+	# 第三阶段对话框要保持移开。_apply_all 是 deferred 的，
+	# 所以要更晚一步推（call_deferred 再嵌一层）。
+	if _dialog_hidden_p3:
+		call_deferred("_apply_dialog_hidden_instant")
 	_play_sentence_voice()
 	if phase == "playing":
 		if curved_arc_defer > 0.0:
@@ -766,6 +775,7 @@ func _complete_sentence() -> void:
 	_update_bars()
 	_save_records()
 	_play_circle_result()
+	_notify_phase3_first_done()
 	if sfx_player != null:
 		sfx_player.play_sentence_complete()
 		sfx_player.play_accept(current_kind, pressure, MAX_VALUE)
@@ -1006,18 +1016,50 @@ func _spawn_curved_sentence(body: String, tone: String) -> void:
 	settings["fade_drift"] = Vector2(0.0, SENTENCE_FADE_DRIFT)
 	settings["fade_glyph_drift"] = Vector2.ZERO
 	settings["fade_shrink"] = 1.0
-	if _sentence_phase() == "phase1":
+	var phase_name := _sentence_phase()
+	if phase_name == "phase1":
 		# 第一阶段：平直，不弯
 		settings["curve_mode"] = CurvedText.CurveShape.STRAIGHT
 		settings["rotate_follow"] = 0.0
 		settings["radius"] = 0.0
+	elif phase_name == "phase3":
+		# 第三阶段：没有对话框了，字直接飘在屏幕里 —— 用更夸张的曲线
+		# 逐句轮换 ARC / WAVE / CIRCLE / BEZIER，避免每句都一样
+		match round_number % 4:
+			0:
+				settings["curve_mode"] = CurvedText.CurveShape.ARC
+				settings["radius"] = 420.0
+				settings["rotate_follow"] = 1.0
+			1:
+				settings["curve_mode"] = CurvedText.CurveShape.WAVE
+				settings["wave_amplitude"] = 34.0
+				settings["wave_length"] = 380.0
+				settings["rotate_follow"] = 0.65
+			2:
+				settings["curve_mode"] = CurvedText.CurveShape.BEZIER
+				settings["bezier_bulge"] = 150.0
+				settings["rotate_follow"] = 0.8
+			_:
+				settings["curve_mode"] = CurvedText.CurveShape.CIRCLE
+				settings["radius"] = 210.0
+				settings["rotate_follow"] = 1.0
+		settings["outline_size"] = 6
 	else:
 		settings["curve_mode"] = CurvedText.CurveShape.ARC
 		settings["radius"] = 560.0
 		settings["rotate_follow"] = 1.0
 	var stage_size := _stage_size()
+	var is_p3 := _sentence_phase() == "phase3"
 	var line_gap := float(font_size) * 1.42
 	var center_y := stage_size.y * (0.30 if lines.size() <= 1 else 0.34)
+	# 第三阶段没有对话框，字直接飘在屏幕中央；字号也放大一点
+	if is_p3:
+		# 第三阶段：字放屏幕下半部（避开人脸），字号加大
+		center_y = stage_size.y * 0.72
+		if font_size < 42:
+			font_size = 42
+			settings["font_size"] = 42
+		line_gap = float(font_size) * 1.55
 	for i in lines.size():
 		var y := center_y + (float(i) - float(lines.size() - 1) * 0.5) * line_gap
 		var anchor := Vector2(stage_size.x * 0.5, y)
@@ -1209,6 +1251,12 @@ var _last_input_length := 0
 var _curved_sentence_nodes: Array[Node2D] = []
 ## 对话框字格逐字浮现用的 tween
 var _cell_tween: Tween = null
+## 第三阶段把对话框移开的 tween
+var _dialog_swing_tween: Tween = null
+## 对话框的原始 offset_top（用于复位）
+var _dialog_home_top := -1.0
+## 第三阶段是否已把对话框移开
+var _dialog_hidden_p3 := false
 ## 父母合影闪现是否已触发过（一个阶段只触发一次）
 var _parents_flash_fired := false
 ## 本阶段还要从 overheard 池抽几句（>0 表示正在用偷听句子）
@@ -1497,6 +1545,11 @@ func _update_mood_layer() -> void:
 	if phase3_gallery != null:
 		if phase3_gallery.is_active() != want_gallery3:
 			phase3_gallery.set_active(want_gallery3)
+			# 进入 / 离开第三阶段时，对话框跟着移开 / 移回
+			if want_gallery3:
+				pass   # 移开动作在第一句打完后由 _notify_phase3_first_done 触发
+			else:
+				_swing_dialog_away(false)
 		if want_gallery3:
 			phase3_gallery.set_progress(_stage3_progress())
 
@@ -1698,3 +1751,55 @@ func skip_voice_wait() -> void:
 			input_box.editable = true
 			input_box.call_deferred("grab_focus")
 		state_label.text = "可以开始输入"
+
+
+## 第三阶段第一句打完之后：把中心小框拉开成全屏，并让对话框向下移开
+func _notify_phase3_first_done() -> void:
+	if _story_stage() != 3:
+		return
+	if phase3_gallery == null or phase3_gallery.is_expanded():
+		return   # 已经拉开过了，不重复触发
+	# 1) 照片拉开
+	if phase3_gallery != null:
+		phase3_gallery.expand_to_full()
+	# 2) 对话框向下移开
+	_swing_dialog_away(true)
+	# 3) 飘字用第三阶段的曲线（下一句开始生效）
+
+
+## 把对话框向下移开 / 移回
+func _swing_dialog_away(away: bool) -> void:
+	var panel: Control = %SentencePanel
+	if panel == null:
+		return
+	if _dialog_swing_tween != null and _dialog_swing_tween.is_valid():
+		_dialog_swing_tween.kill()
+
+	# 记录"复位用的原始坐标"（第一次移开时保存）
+	if _dialog_home_top < 0.0:
+		_dialog_home_top = panel.offset_top
+
+	var h: float = panel.size.y + 40.0
+	var target_top: float = _dialog_home_top + (h if away else 0.0)
+
+	_dialog_hidden_p3 = away
+
+	_dialog_swing_tween = create_tween()
+	_dialog_swing_tween.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_CUBIC)
+	# offset_top / offset_bottom 一起动，才是"整体下移"而不是"拉高"
+	_dialog_swing_tween.set_parallel(true)
+	var target_bottom: float = target_top + panel.size.y
+	_dialog_swing_tween.tween_property(panel, "offset_top", target_top, 1.2 if away else 0.9)
+	_dialog_swing_tween.tween_property(panel, "offset_bottom", target_bottom, 1.2 if away else 0.9)
+
+
+## 瞬时把对话框设到"已移开"的状态（换句复位后立即推回去）
+func _apply_dialog_hidden_instant() -> void:
+	var panel: Control = %SentencePanel
+	if panel == null or _dialog_home_top < 0.0:
+		return
+	if _dialog_swing_tween != null and _dialog_swing_tween.is_valid():
+		_dialog_swing_tween.kill()
+	var target_top: float = _dialog_home_top + panel.size.y + 40.0
+	panel.offset_top = target_top
+	panel.offset_bottom = target_top + panel.size.y
