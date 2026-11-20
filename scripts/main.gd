@@ -151,16 +151,19 @@ var curved_arc_defer := 0.0
 ## 按住固定 2.5 秒，这句话被跳过
 const RESIST_HOLD_TIME := 2.5
 ## 每抵抗一句：麻木固定 +14
-const RESIST_NUMBNESS := 14.0
+const RESIST_NUMBNESS := 18.0
 ## 每抵抗一句：好感 -3（不加压力）
 const RESIST_AFFECTION_LOSS := 3.0
+## 接受负面句时累积的麻木（被说到麻木）
+const BAD_NUMBNESS := {1: 14.0, 2: 7.0}
 
 ## ---- 句子五档（1 = 最坏，5 = 最好）----
 ## 每档对压力 / 好感的影响
 const TIER_PRESSURE := {1: 12.0, 2: 8.0, 3: 1.0, 4: -8.0, 5: -14.0}
 const TIER_AFFECTION_BONUS := {1: 0.75, 2: 0.90, 3: 1.00, 4: 1.10, 5: 1.25}
 ## 抽取权重（中性最多，两端最少）
-const TIER_WEIGHT := {1: 1.2, 2: 2.4, 3: 5.0, 4: 2.4, 5: 1.2}
+## 抽取权重：负面（1/2 档）明显提高，中性降低
+const TIER_WEIGHT := {1: 1.8, 2: 3.2, 3: 4.2, 4: 2.2, 5: 1.2}
 ## 连续同侧上限：坏（1/2）最多 2 次，好（4/5）与中性最多 4 次
 const TIER_MAX_RUN := {1: 2, 2: 2, 3: 4, 4: 4, 5: 4}
 var resisting := false
@@ -963,6 +966,12 @@ func _advance_sentence(message: String) -> void:
 	if not entry.is_empty():
 		current_tier = int(entry.get("tier", 3))
 		current_kind = _tier_kind(current_tier)
+		# 固定开场句也要记进已用集合，否则后面可能又被随机抽到
+		var uk := _used_key(_sentence_phase(), current_kind)
+		var ul: Array = _used_texts.get(uk, [])
+		if not ul.has(String(entry["text"])):
+			ul.append(String(entry["text"]))
+			_used_texts[uk] = ul
 		_kind_run = 1
 		_last_tier = current_tier
 		_last_side = _tier_side(current_tier)
@@ -1129,17 +1138,12 @@ func _remaining_pool(phase: String, kind: String, tier: int = 0) -> Array:
 func _pick_next_tier() -> int:
 	var phase := _sentence_phase()
 	var tiers: Array[int] = [1, 2, 3, 4, 5]
+	# 这里绝不清空已用记录（那会让刚抽过的句子再出现）；
+	# 某类型抽空由 _draw_sentence 去「借」同阶段其它类型
 	var remain := {}
 	var total_left := 0
 	for t in tiers:
-		var kind := _tier_kind(t)
-		var n := _remaining_pool(phase, kind, t).size()
-		if n == 0:
-			# 该档抽完了 → 清空整个池的已用记录，允许重抽
-			_used_texts.erase(_used_key(phase, kind))
-			n = _remaining_pool(phase, kind, t).size()
-			if n == 0:
-				n = _remaining_pool(phase, kind, 0).size()
+		var n := _remaining_pool(phase, _tier_kind(t), t).size()
 		remain[t] = n
 		total_left += n
 	if total_left <= 0:
@@ -1206,7 +1210,9 @@ func _opener_entry(n: int) -> Dictionary:
 	return {}
 
 
-## 抽一句：抽过的不会再抽到。tier>0 时优先在该档内抽。
+## 抽一句：抽过的不会再抽到。
+##   优先在该档内抽 → 该档空了就在同类型里抽 → 该类型也空了就借同阶段其它类型
+##   只有整个阶段都抽完，才允许重抽（否则会出现「刚抽过的句子又出现」）
 func _draw_sentence(kind: String, tier: int = 0) -> Dictionary:
 	var phase := _sentence_phase()
 	var options: Array = []
@@ -1214,6 +1220,14 @@ func _draw_sentence(kind: String, tier: int = 0) -> Dictionary:
 		options = _remaining_pool(phase, kind, tier)
 	if options.is_empty():
 		options = _remaining_pool(phase, kind, 0)
+	if options.is_empty():
+		for k2 in ["neutral", "positive", "negative"]:
+			if k2 == kind:
+				continue
+			options = _remaining_pool(phase, k2, 0)
+			if not options.is_empty():
+				kind = k2
+				break
 	if options.is_empty():
 		_used_texts.erase(_used_key(phase, kind))
 		options = SentenceData.pool(phase, kind).duplicate()
@@ -1538,10 +1552,13 @@ func _complete_sentence() -> void:
 	else:
 		pressure = maxf(0.0, pressure + dp)
 	# 负面句才涌上泪水；坏2（tier1）最重，坏1（tier2）弱一些
+	# 同时「被说到麻木」：接下负面句会积累麻木，麻木才可能真的满
 	if current_tier == 1:
 		_play_tears(1.0)
+		numbness = minf(MAX_VALUE, numbness + BAD_NUMBNESS[1])
 	elif current_tier == 2:
 		_play_tears(0.55)
+		numbness = minf(MAX_VALUE, numbness + BAD_NUMBNESS[2])
 	_fade_out_curved_sentence()
 	_update_bars()
 	_save_records()
@@ -2596,10 +2613,10 @@ func _update_mood_layer() -> void:
 		if want_gallery3:
 			phase3_gallery.set_progress(_stage3_progress())
 
-	# 二阶段有真实立绘了，占位的「……」就不用了
+	# 占位的「……」已经不需要了（二阶段有真实立绘），一律隐藏
 	var presence := get_node_or_null("Stage/Clip/BossArea/Presence") as Control
 	if presence != null:
-		presence.visible = not want_room2
+		presence.visible = false
 
 
 ## 当前处在剧情的第几阶段（1/2/3），按好感度阈值分
