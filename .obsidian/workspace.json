@@ -1,0 +1,209 @@
+{
+  "main": {
+    "id": "fa955ffc800376fa",
+    "type": "split",
+    "children": [
+      {
+        "id": "9a0f47cf845c6d52",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "0e7fd16a3b79e017",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "新标签页"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "923793656bcc0102",
+    "type": "split",
+    "children": [
+      {
+        "id": "284b69d36aacf8a2",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "d040531959920b70",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "文件列表"
+            }
+          },
+          {
+            "id": "98ebf7de3c5ce90e",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "搜索"
+            }
+          },
+          {
+            "id": "a2d9d87eacd79c87",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "书签"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "6839d1cd68cd54a0",
+    "type": "split",
+    "children": [
+      {
+        "id": "175620dff6c23dc5",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "eab9bd1c7c371d26",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "反向链接"
+            }
+          },
+          {
+            "id": "98c05db2b25a727a",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "出链"
+            }
+          },
+          {
+            "id": "b8d723b3049830a6",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "标签"
+            }
+          },
+          {
+            "id": "8e25f6b06e6dd650",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "添加笔记属性"
+            }
+          },
+          {
+            "id": "4c071e568a05884d",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "大纲"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:打开快速切换": false,
+      "graph:查看关系图谱": false,
+      "canvas:新建白板": false,
+      "daily-notes:打开/创建今天的日记": false,
+      "templates:插入模板": false,
+      "command-palette:打开命令面板": false,
+      "bases:新建数据库": false
+    }
+  },
+  "active": "d040531959920b70",
+  "lastOpenFiles": [
+    "scenes/ResultPanel.tscn",
+    "scenes/TearsFx.tscn",
+    "scenes/Phase3Gallery.tscn",
+    "scenes/Phase2Room.tscn",
+    "scenes/MoodLayer.tscn",
+    "scenes/GameHUD.tscn",
+    "scenes/EndingLayer.tscn",
+    "scenes/PauseOverlay.tscn",
+    "scenes/TutorialLayer.tscn",
+    "scenes/MainMenu.tscn",
+    "导出指南.md",
+    "audio/bgm/out_of_love.mp3",
+    "art/ui/menu_bg.jpg",
+    "art/story/p7_monster.jpg",
+    "art/story/p6_dark.jpg",
+    "art/story/p5_dream.jpg",
+    "art/story/p4_bedroom.jpg",
+    "art/story/p3_living.jpg",
+    "art/story/p2_stairs.jpg",
+    "art/story/p1_building.jpg",
+    "art/story/fin_4.jpg",
+    "art/story/fin_3.jpg"
+  ]
+}
