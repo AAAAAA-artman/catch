@@ -12,7 +12,7 @@ extends Node
 signal playback_finished
 
 ## 语音音量
-@export_range(-40.0, 12.0, 0.5) var volume_db := 3.0
+@export_range(-40.0, 12.0, 0.5) var volume_db := 7.0
 
 ## 语音加速倍率（1.0 = 原速）。原始语音 6~9 秒太长，压到 2.2 倍速 ≈ 3 秒。
 @export_range(1.0, 4.0, 0.05) var speed_scale := 2.2

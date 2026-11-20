@@ -1351,15 +1351,18 @@ func _build_pinyin_cells() -> void:
 
 
 ## 让对话框里的字格一个接一个淡入（和画面上的飘字同时开始）
+## 字格逐字浮现：每个字固定间隔，间隔按句长自适应
+## （原来总时长固定，长句里每个字的延迟被压到 0.02s，看起来像一起出现）
 func _reveal_cells(cells: Array) -> void:
 	if cells.is_empty():
 		return
 	if _cell_tween != null and _cell_tween.is_valid():
 		_cell_tween.kill()
-	# 让"逐字浮现"的总时长和画面飘字的淡入大致同步
 	var n := maxi(cells.size(), 1)
-	var dur := 0.45
-	var step := clampf((SENTENCE_FADE_IN * 0.80 - dur) / float(n), 0.02, 0.12)
+	# 单字淡入时长
+	var dur := 0.28
+	# 字与字之间的间隔：句子越长间隔越小，但保底 0.035s，上限 0.09s
+	var step := clampf(2.2 / float(n), 0.035, 0.09)
 	_cell_tween = create_tween()
 	_cell_tween.set_parallel(true)
 	var i := 0
@@ -1848,8 +1851,9 @@ func _spawn_curved_sentence(body: String, tone: String) -> void:
 	var lines: PackedStringArray = plan["lines"]
 	settings["font_size"] = font_size
 	settings["fade_duration"] = SENTENCE_FADE_IN
-	# stagger = 0 → 整句话作为一个整体一起淡入（不是逐字）
-	settings["fade_stagger"] = 0.0
+	# stagger > 0 → 逐字浮现（从左到右一个字一个字出现）
+	# 第一/二阶段明显逐字，第三阶段字在面板里，飘字不显示所以无所谓
+	settings["fade_stagger"] = 0.82
 	settings["fade_power"] = 1.0
 	settings["free_when_done"] = false
 	# 微平移：淡入时从下方滑到位（漂移量在淡入过程中线性收为 0）
@@ -2633,18 +2637,21 @@ func _update_mood_layer() -> void:
 
 
 ## 当前处在剧情的第几阶段（1/2/3），按好感度阈值分
+## 当前处在哪个阶段（1/2/3）。
+## 【重要】按句数判定，不按好感阈值：
+##   Alt 抵抗会扣好感，如果按好感判定，第二阶段抵抗一次就可能跌破 1/3
+##   退回第一阶段，画面/句子池全部倒退（这是之前"抵抗后画面变回一阶段"的 bug）。
+##   仍然在满好感时优先返回 3，保证结局流程正常。
 func _story_stage() -> int:
-	if affection >= STORY_MID_2:
+	if affection >= MAX_VALUE:
 		return 3
-	if affection >= STORY_MID_1:
-		return 2
-	return 1
+	var idx := clampi((round_number - 1) / ROUNDS_PER_STAGE, 0, STAGE_COUNT - 1)
+	return idx + 1
 
 
-## 阶段二进度 0~1（好感度 1/3 → 2/3）
+## 阶段二进度 0~1（按句数，和阶段判定保持一致）
 func _stage2_progress() -> float:
-	var span := maxf(STORY_MID_2 - STORY_MID_1, 0.001)
-	return clampf((affection - STORY_MID_1) / span, 0.0, 1.0)
+	return clampf(float(_stage_index_in_stage()) / float(ROUNDS_PER_STAGE), 0.0, 1.0)
 
 
 ## 把一句长句拆成 1~2 行，并选一个能放下的字号。
