@@ -154,12 +154,12 @@ const RESIST_HOLD_TIME := 2.5
 const RESIST_NUMBNESS := 18.0
 ## 每抵抗一句：好感 -3（不加压力）
 const RESIST_AFFECTION_LOSS := 3.0
-## 接受负面句时累积的麻木（被说到麻木）
-const BAD_NUMBNESS := {1: 14.0, 2: 7.0}
+
 
 ## ---- 句子五档（1 = 最坏，5 = 最好）----
 ## 每档对压力 / 好感的影响
-const TIER_PRESSURE := {1: 12.0, 2: 8.0, 3: 1.0, 4: -8.0, 5: -14.0}
+## 压力变化：负面句明显加压（逼玩家用 Alt 抵抗）
+const TIER_PRESSURE := {1: 18.0, 2: 12.0, 3: 2.0, 4: -8.0, 5: -14.0}
 const TIER_AFFECTION_BONUS := {1: 0.75, 2: 0.90, 3: 1.00, 4: 1.10, 5: 1.25}
 ## 抽取权重（中性最多，两端最少）
 ## 抽取权重：负面（1/2 档）明显提高，中性降低
@@ -560,7 +560,7 @@ func _build_tutorial_overlay() -> void:
 	_tutorial_layer.add_child(center)
 
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(720, 0)
+	panel.custom_minimum_size = Vector2(760, 0)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.035, 0.04, 0.04, 0.97)
 	style.border_color = Color(1.0, 0.94, 0.0, 0.6)
@@ -574,7 +574,7 @@ func _build_tutorial_overlay() -> void:
 	center.add_child(panel)
 
 	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 14)
+	vb.add_theme_constant_override("separation", 8)
 	panel.add_child(vb)
 
 	var font := _game_font_resource()
@@ -590,20 +590,27 @@ func _build_tutorial_overlay() -> void:
 
 	var lines := [
 		"· 屏幕上会出现一句话，把它完整打出来就算「接住」",
-		"· 打错要整句重打，压力 +8",
-		"· 按住 Alt 可以抵抗跳过这句：麻木 +14、好感 −3，但不加压力",
-		"· 左条是剩余时间，右边两条是压力与麻木，任一满 100 就失败",
+		"· 打错要整句重打",
+		"",
+		"· 按住 Alt 可以抵抗跳过这句话 —— 这是最重要的操作",
+		"    抵抗不涨压力，但会让你越来越麻木",
+		"    麻木满了，就再也听不见了",
+		"",
+		"· 左边竖条是剩余时间，右边两条是压力与麻木",
+		"    压力满了会崩溃，麻木满了会聋掉，任一满就结束",
+		"· 压力高的时候，不要硬扛，按住 Alt 跳过",
+		"",
 		"· Esc 打开暂停菜单（继续 / 设置 / 回主界面）",
-		"· 打字方式（拼音 / 汉字）可在「设置」里切换，默认拼音",
+		"· 打字方式（拼音 / 汉字）可在「设置」里切换",
 	]
 	for t in lines:
 		var l := Label.new()
 		l.text = t
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		l.custom_minimum_size = Vector2(620, 0)
+		l.custom_minimum_size = Vector2(620, 24)
 		if font != null:
 			l.add_theme_font_override("font", font)
-		l.add_theme_font_size_override("font_size", 20)
+		l.add_theme_font_size_override("font_size", 18)
 		l.add_theme_color_override("font_color", Color(0.88, 0.87, 0.82))
 		vb.add_child(l)
 
@@ -914,6 +921,7 @@ func _start_game(mode: String) -> void:
 	_final_done = 0
 	_final_played = false
 	_final_finishing = false
+	_alt_hint_shown = false
 	_final_image_index = -1
 	_final_music_on = false
 	_set_final_hud(false)
@@ -1543,6 +1551,11 @@ func _complete_sentence() -> void:
 	var gained: int = int(BASE_SCORE[current_kind]) + typing_score
 	score += gained
 	var message := "接住了。+%d 分，速度 %.0f 字符/分" % [gained, speed]
+	# 压力偏高时提醒一次：现在该用 Alt 了
+	if not _alt_hint_shown and pressure >= 70.0:
+		_alt_hint_shown = true
+		if not _dialog_hidden_p3:
+			_show_feedback("压力很高 · 按住 Alt 抵抗这句", Color("ff9e7e"))
 	var affection_gain := _affection_from_performance(speed)
 	affection = minf(MAX_VALUE, affection + affection_gain)
 	# 压力按「五档」变化：坏句加压、好句减压
@@ -1552,13 +1565,11 @@ func _complete_sentence() -> void:
 	else:
 		pressure = maxf(0.0, pressure + dp)
 	# 负面句才涌上泪水；坏2（tier1）最重，坏1（tier2）弱一些
-	# 同时「被说到麻木」：接下负面句会积累麻木，麻木才可能真的满
+	# 注意：麻木只由「Alt 抵抗」累积，接受负面句不会加麻木
 	if current_tier == 1:
 		_play_tears(1.0)
-		numbness = minf(MAX_VALUE, numbness + BAD_NUMBNESS[1])
 	elif current_tier == 2:
 		_play_tears(0.55)
-		numbness = minf(MAX_VALUE, numbness + BAD_NUMBNESS[2])
 	_fade_out_curved_sentence()
 	_update_bars()
 	_save_records()
@@ -2087,6 +2098,8 @@ var main_menu: Control = null
 var _pause_settings_open := false
 ## 暂停前处于哪个 phase（playing / final），恢复时要用
 var _paused_from := "playing"
+## 本局是否已经提醒过「用 Alt 抵抗」
+var _alt_hint_shown := false
 ## 游戏内的操作说明浮层
 var _tutorial_layer: Control = null
 ## Ending 画面（半透明黑底 + 白字上飘）
