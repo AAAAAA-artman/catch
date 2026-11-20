@@ -10,7 +10,7 @@ const LINES := [
 	"",
 	"音效来自于：魔王魂，耳聆网",
 	"音乐：Circulation、There's something Outside、萍逢",
-	"　　　来自乌鸦 Producer",
+	"      来自乌鸦 Producer",
 	"Dream street A01 来自星空魔法师 Lei",
 	"Out of love",
 	"",

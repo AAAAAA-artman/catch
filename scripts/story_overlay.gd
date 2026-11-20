@@ -14,7 +14,7 @@ signal finished(segment_id: String)
 const TYPE_SPEED := 38.0   ## 每秒显示多少字
 const FADE_TIME := 0.45
 const FAST_FORWARD_INTERVAL := 0.15
-const ADVANCE_HINT := "空格 / 回车 / 点击 继续　·　按住 Ctrl 快进"
+const ADVANCE_HINT := "空格 / 回车 / 点击 继续  ·  按住 Ctrl 快进"
 
 var _lines: Array = []
 var _index := -1
