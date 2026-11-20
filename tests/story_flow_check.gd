@@ -21,18 +21,18 @@ func _initialize() -> void:
 	await _drain_stories("开局")
 
 	# 第一段游戏 → 1/3
-	_push_to(35.0)
+	_push_to_round(10)
 	await _frames(4)
 	await _drain_stories("1/3 后")
 
 	# 第二段游戏 → 2/3
-	_push_to(69.0)
+	_push_to_round(20)
 	await _frames(4)
 	await _drain_stories("2/3 后")
 
 	# 第三段游戏 → 满（基准 6.5 × 0.6 也能到 100）
 	# 好感满后会先进「终章 5 句」，打完才播 epilogue
-	_push_to(100.0)
+	_push_to_round(30)
 	await _frames(4)
 	await _drain_final()
 	await _drain_stories("终章后")
@@ -54,16 +54,15 @@ func _initialize() -> void:
 	quit()
 
 
-func _push_to(value: float) -> void:
-	# 直接把好感设到目标值，再走一次结算触发剧情检查。
-	# （新的好感算法按"阶段内剩余句数"均分，单句涨幅很小，
-	#   靠结算慢慢爬要打十几句，测试里直接设值更快也更稳定。）
-	game.affection = value
+## 推进到第 n 句并触发一次结算（剧情现在按【句数】触发，不是好感）
+func _push_to_round(n: int) -> void:
+	game.round_number = n
+	game.affection = 100.0 * float(n) / float(game.MAX_ROUNDS)
 	game.phrase_elapsed = 20.0
 	game.phrase_mistakes = 0
 	game._update_bars()
 	game._complete_sentence()
-	print("   好感度 → ", snappedf(game.affection, 0.1))
+	print("   推进到第 ", game.round_number, " 句（好感 ", snappedf(game.affection, 1), "）")
 
 
 ## 打完终章句子池（好感满后的独立段）

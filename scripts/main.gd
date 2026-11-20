@@ -59,7 +59,7 @@ var records := {
 	"pinyin": {"best_score": 0, "best_speed": 0.0}
 }
 var rng := RandomNumberGenerator.new()
-var kind_deck: Array[String] = []
+
 ## 抽取状态：已经抽过的句子 "phase:kind" -> Array[String]
 var _used_texts := {}
 ## 当前连续同类型句数
@@ -151,7 +151,8 @@ var curved_arc_defer := 0.0
 ## 按住固定 2.5 秒，这句话被跳过
 const RESIST_HOLD_TIME := 2.5
 ## 每抵抗一句：麻木固定 +14
-const RESIST_NUMBNESS := 18.0
+## 每抵抗一句累积的麻木（100/14 ≈ 7 次，配合 9~10 句坏句需要取舍）
+const RESIST_NUMBNESS := 14.0
 ## 每抵抗一句：好感 -3（不加压力）
 const RESIST_AFFECTION_LOSS := 3.0
 
@@ -159,7 +160,11 @@ const RESIST_AFFECTION_LOSS := 3.0
 ## ---- 句子五档（1 = 最坏，5 = 最好）----
 ## 每档对压力 / 好感的影响
 ## 压力变化：负面句明显加压（逼玩家用 Alt 抵抗）
-const TIER_PRESSURE := {1: 18.0, 2: 12.0, 3: 2.0, 4: -8.0, 5: -14.0}
+## 压力：坏句加压、好句减压。数值经过 2000 局模拟校准：
+##   · 从不抵抗：约 8% 死于压力
+##   · 压 55 才抵抗：约 2% 死于麻木，通关率 > 90%
+##   · 到处抵抗：约 60% 死于麻木
+const TIER_PRESSURE := {1: 15.0, 2: 10.0, 3: 2.0, 4: -8.0, 5: -14.0}
 const TIER_AFFECTION_BONUS := {1: 0.75, 2: 0.90, 3: 1.00, 4: 1.10, 5: 1.25}
 ## 抽取权重（中性最多，两端最少）
 ## 抽取权重：负面（1/2 档）明显提高，中性降低
@@ -885,8 +890,6 @@ func _show_title() -> void:
 	input_box.text = ""
 	_last_input_length = 0  # 换句/进剧情时同步重置击键计数
 	input_box.editable = false
-	if round_label != null and false:
-		round_label.text = "1 汉字   2 拼音"
 	_refresh_stats()
 	_update_bars()
 	_clear_curved_text()
@@ -1043,8 +1046,6 @@ func _advance_sentence(message: String) -> void:
 		_build_hanzi_cells()
 	_update_typing_progress("")
 	call_deferred("_place_cursor_after_layout")
-	if round_label != null and false:
-		round_label.text = "第 %d / %d 句" % [round_number, MAX_ROUNDS]
 	input_box.placeholder_text = "在这里输入汉字"
 	_refresh_stats()
 	if hud_layout != null:
@@ -1943,17 +1944,19 @@ func _spawn_curved_banner(body: String, tone: String, hold: float = 5.5) -> void
 ## 当前好感度下、该接着播的剧情段（按流程顺序，一次只返回一段）。
 ## 三段游戏各自的"结束标记"是 act1_end / act2_end / epilogue，
 ## 中间过场 intro 段的 act1_intro 与 act1_end 连着播。
+## 全部按【句数】触发，和阶段画面 / 句子池 / 同心圆 / 好感进度保持一致。
+## 之前用好感阈值：Alt 抵抗扣好感会让剧情推迟甚至永不触发，
+## 与「按句数分阶段」形成两套标准，是反复出 bug 的根源。
 func _next_story_id() -> String:
-	# 注意：act1_intro（过渡文本一）**不在**这里按好感度触发 ——
-	# 它在开局 prologue 之后立刻播完，然后才是第一段游戏。
-	# 这里只留第一段游戏之后的 act1_end。
-	if not story_seen.has(STORY_ACT1_END) and affection >= STORY_MID_1:
+	# act1_intro（过渡文本一）在开局 prologue 后立刻播，不在这里
+	# 第一段游戏打完（第 10 句）→ act1_end
+	if not story_seen.has(STORY_ACT1_END) and round_number >= ROUNDS_PER_STAGE:
 		return STORY_ACT1_END
-	# 第二段游戏打完 → act2_end
-	if not story_seen.has(STORY_ACT2_END) and affection >= STORY_MID_2:
+	# 第二段游戏打完（第 20 句）→ act2_end
+	if not story_seen.has(STORY_ACT2_END) and round_number >= ROUNDS_PER_STAGE * 2:
 		return STORY_ACT2_END
-	# 第三段游戏打完 → epilogue
-	if not story_seen.has(STORY_EPILOGUE) and affection >= MAX_VALUE:
+	# 第三段打完（第 30 句）→ epilogue
+	if not story_seen.has(STORY_EPILOGUE) and round_number >= MAX_ROUNDS:
 		return STORY_EPILOGUE
 	return ""
 
@@ -2332,8 +2335,7 @@ var _parents_flash_fired := false
 ## 本阶段还要从 overheard 池抽几句（>0 表示正在用偷听句子）
 ## 特殊句的编排：本阶段每句是否为特殊句
 var _special_plan: Array[bool] = []
-## 本阶段第几句（0 开始）
-var _special_index := 0
+
 ## 这一阶段用过的偷听句（避免重复）
 var _overheard_used: Array[String] = []
 
@@ -2584,19 +2586,6 @@ func _measure_flow_height(flow: Control, available: float) -> float:
 ## 当前阶段内的好感度进度（0~1）。注意是「阶段」而不是总好感度：
 ## 阶段1: 0 → 1/3，阶段2: 1/3 → 2/3，阶段3: 2/3 → 满
 ## 所以每进新阶段，内圆会重新从小开始长。
-func _stage_affection_progress() -> float:
-	var start := 0.0
-	var end := STORY_MID_1
-	if affection >= STORY_MID_2:
-		start = STORY_MID_2
-		end = MAX_VALUE
-	elif affection >= STORY_MID_1:
-		start = STORY_MID_1
-		end = STORY_MID_2
-	return clampf((affection - start) / maxf(end - start, 0.001), 0.0, 1.0)
-
-
-## 每句结算后让同心圆浮现，内圆按当前阶段好感度缩放
 func _play_circle_result() -> void:
 	if circle_fx == null:
 		return
