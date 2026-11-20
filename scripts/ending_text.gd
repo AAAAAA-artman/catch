@@ -7,7 +7,7 @@ extends Label
 const LINES := [
 	"代码：DSH 刘友浤",
 	"美术：于于",
-	"句子编写，音频等：郭桑笑，蒋博博",
+	"句子编写，音频等：阿喵，蒋博博",
 	"",
 	"音效来自于：魔王魂，耳聆网",
 	"音乐：Circulation、There's something Outside、萍逢",

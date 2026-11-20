@@ -1917,7 +1917,10 @@ func _advance_final_image() -> void:
 
 func _advance_final_sentence(message: String) -> void:
 	if _final_queue.is_empty():
-		_end_game(true)
+		# 队列已空：交给 _complete_final_sentence 的收尾路径，
+		# 不能在这里直接结束（否则最后一句会重复显示、epilogue 被跳过）
+		if not _final_finishing:
+			_complete_final_sentence()
 		return
 	var entry: Dictionary = _final_queue.pop_front()
 	_final_done += 1
@@ -1966,6 +1969,9 @@ func _advance_final_sentence(message: String) -> void:
 
 
 func _complete_final_sentence() -> void:
+	# 收尾已开始：拒绝再次结算（否则最后一句会被反复"接住"）
+	if _final_finishing:
+		return
 	_fade_out_curved_sentence()
 	# 不加好感、不加压力、不加分 —— 和所有资源无关
 	if sfx_player != null:
@@ -1974,12 +1980,19 @@ func _complete_final_sentence() -> void:
 		if _final_finishing:
 			return
 		_final_finishing = true
+		# 立刻锁死输入，避免收尾等待期间又被打一次同一句
+		current_target = ""
+		current_pinyin = PackedStringArray()
+		input_box.text = ""
+		input_box.editable = false
+		_last_input_length = 0
 		state_label.text = "全部接住了"
 		_show_feedback("全部接住了。", Color("fff2c8"))
 		await get_tree().create_timer(1.1).timeout
-		# 终章打完 → 播结尾剧情 epilogue，它演完才真正结束
+		# 终章打完 → 播结尾剧情 epilogue；epilogue 演完才进 ED
 		pending_message = ""
 		story_resume = "ending"
+		phase = "story"          # 先离开 final，防止收尾逻辑被重复触发
 		_play_story(STORY_EPILOGUE)
 		return
 	_show_feedback("接住了。", Color("f7d292"))
@@ -2030,7 +2043,8 @@ var _final_music_on := false
 ## 终章是否已经打过（决定 epilogue 的时机）
 var _final_played := false
 ## 终章收尾是否已经开始（防重复触发）
-var _final_finishing := false## 面板原始背景样式（移到中央时换透明）
+var _final_finishing := false
+## 面板原始背景样式（移到中央时换透明）
 var _dialog_home_style: StyleBox = null
 ## 父母合影闪现是否已触发过（一个阶段只触发一次）
 var _parents_flash_fired := false
