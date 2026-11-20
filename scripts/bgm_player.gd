@@ -14,23 +14,11 @@ signal track_changed(path: String)
 
 var library := {}
 
-var _current: AudioStreamPlayer
-var _next: AudioStreamPlayer
+@onready var _current: AudioStreamPlayer = $TrackA
+@onready var _next: AudioStreamPlayer = $TrackB
 var _tween: Tween
 var _current_path := ""
 var _cache := {}
-
-
-func _ready() -> void:
-	for i in 2:
-		var player := AudioStreamPlayer.new()
-		player.bus = "Master"
-		player.volume_db = -80.0
-		add_child(player)
-		if i == 0:
-			_current = player
-		else:
-			_next = player
 
 
 func set_library(tracks: Dictionary) -> void:

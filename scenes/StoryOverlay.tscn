@@ -1,0 +1,123 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/story_overlay.gd" id="1_foxu7"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_b6mlf"]
+bg_color = Color(0, 0, 0, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.94, 0, 0.9)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_l2irg"]
+content_margin_left = 30.0
+content_margin_top = 22.0
+content_margin_right = 30.0
+content_margin_bottom = 16.0
+bg_color = Color(0.035, 0.038, 0.055, 0.55)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.55, 0.52, 0.6, 0.45)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[node name="StoryOverlay" type="Control" unique_id=515887898]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_foxu7")
+
+[node name="Background" type="TextureRect" parent="." unique_id=2034107139]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="PhotoFrame" type="Panel" parent="." unique_id=642658413]
+visible = false
+layout_mode = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_b6mlf")
+
+[node name="Photo" type="TextureRect" parent="PhotoFrame" unique_id=290538910]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 2.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = -2.0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Letter" type="Control" parent="." unique_id=1315943165]
+visible = false
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Scrim" type="ColorRect" parent="Letter" unique_id=1763607258]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0.55)
+
+[node name="Blackout" type="ColorRect" parent="." unique_id=641415904]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+
+[node name="Dim" type="ColorRect" parent="." unique_id=1621413295]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.02, 0.02, 0.04, 0.26)
+
+[node name="Dialogue" type="PanelContainer" parent="." unique_id=258495614]
+layout_mode = 0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 78.0
+offset_top = -212.0
+offset_right = -78.0
+offset_bottom = -22.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_l2irg")
+
+[node name="Column" type="VBoxContainer" parent="Dialogue" unique_id=382419969]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Speaker" type="Label" parent="Dialogue/Column" unique_id=200525174]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96862745, 0.8235294, 0.57254905, 1)
+theme_override_font_sizes/font_size = 22
+
+[node name="Text" type="Label" parent="Dialogue/Column" unique_id=1495602873]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(1, 0.9529412, 0.9098039, 1)
+theme_override_font_sizes/font_size = 27
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="Hint" type="Label" parent="Dialogue/Column" unique_id=1935564892]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5529412, 0.5294118, 0.59607846, 1)
+theme_override_font_sizes/font_size = 14
+horizontal_alignment = 2

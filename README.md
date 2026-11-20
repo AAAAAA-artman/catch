@@ -99,15 +99,26 @@ cd 接住
 ```
 接住/
 ├── scenes/
-│   └── main.tscn              主场景（唯一场景）
+│   ├── main.tscn              流程入口，连接各界面和声音
+│   ├── MainMenu.tscn          主菜单与设置
+│   ├── StoryOverlay.tscn      剧情对话、插图与书信
+│   ├── TutorialLayer.tscn     首次操作说明
+│   ├── GameHUD.tscn           打字舞台、输入区、数值条和反馈
+│   ├── MoodLayer.tscn         第一幕房间
+│   ├── Phase2Room.tscn        第二幕房间与持烛角色
+│   ├── Phase3Gallery.tscn     第三幕照片与终章背景
+│   ├── TearsFx.tscn           泪眼效果
+│   ├── PauseOverlay.tscn      暂停菜单
+│   ├── ResultPanel.tscn       对局结算与重玩提示
+│   └── EndingLayer.tscn       通关片尾字幕
 ├── scripts/
-│   ├── main.gd                游戏主逻辑（约 1600 行）
+│   ├── main.gd                游戏状态、打字规则与流程衔接
 │   ├── story_data.gd          剧情文案（131 行台词，逐行可改）
 │   ├── story_overlay.gd       剧情演出层
 │   ├── sentence_data.gd       句子池（172 句，按阶段/类型分类）
 │   ├── voice_data.gd          语音池（按句长分类）
 │   ├── speaker_data.gd        说话人判定（父亲 / 母亲）
-│   ├── hud_layout.gd          HUD 版式驱动器（1920×1080 设计稿坐标）
+│   ├── hud_layout.gd          按面板宽度与句长适配字号
 │   ├── vertical_bar.gd        竖条控件（压力 / 麻木 / 时间）
 │   ├── circle_fx.gd           同心圆结算特效
 │   ├── stage_mood.gd          第一阶段画面（变暗 + 模糊切换）
@@ -183,12 +194,7 @@ node.seek(0.5)                  # 手动定位进度
 
 ### HUD 版式
 
-所有坐标写在 **1920×1080 设计稿空间**里，运行时按 16:9 等比缩放。改版式只需动 `hud_layout.gd` 顶部的常量：
-
-```gdscript
-const STAGE_RECT := Rect2(510.0, 30.0, 900.0, 690.0)   # 画面窗口
-const DIALOG_RECT := Rect2(310.0, 740.0, 1290.0, 290.0) # 对话框
-```
+在 Godot 的 2D 编辑器打开 `scenes/GameHUD.tscn`。默认视口为 1280×720。移动 `Stage` 调整中央舞台，移动 `SentencePanel` 调整输入区，三个 `Bar` 节点分别控制时间、压力与麻木条。第三幕后段的面板移动和照片展开由演出脚本控制。
 
 ### 对话框排版
 

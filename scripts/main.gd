@@ -73,41 +73,41 @@ var _last_tier := 3
 var _side_run := 0
 var _last_side := 0
 
-@onready var title_label: Label = %TitleLabel
-@onready var state_label: Label = %StateLabel
-@onready var round_label: Label = %RoundLabel
-@onready var sentence_label: RichTextLabel = %SentenceLabel
-@onready var hanzi_row: HFlowContainer = %HanziRow
-@onready var pinyin_row: HFlowContainer = %PinyinRow
-@onready var sentence_lane: Control = %SentenceLane
+@onready var title_label: Label = $GameHUD/%TitleLabel
+@onready var state_label: Label = $GameHUD/%StateLabel
+@onready var round_label: Label = $GameHUD/%RoundLabel
+@onready var sentence_label: RichTextLabel = $GameHUD/%SentenceLabel
+@onready var hanzi_row: HFlowContainer = $GameHUD/%HanziRow
+@onready var pinyin_row: HFlowContainer = $GameHUD/%PinyinRow
+@onready var sentence_lane: Control = $GameHUD/%SentenceLane
 var pinyin_cells: Array = []
 var character_targets: Array[Label] = []
-@onready var cursor_rect: ColorRect = %CursorRect
+@onready var cursor_rect: ColorRect = $GameHUD/%CursorRect
 var cursor_tween: Tween
-@onready var stats_label: Label = %StatsLabel
-@onready var input_box: LineEdit = %InputBox
-@onready var affection_bar: ProgressBar = %AffectionBar
-@onready var pressure_bar: Control = %PressureBar
-@onready var numbness_bar: Control = %NumbnessBar
-@onready var time_bar: Control = $TimeBar
-@onready var feedback_label: Label = %FeedbackLabel
-@onready var pause_overlay: ColorRect = %PauseOverlay
+@onready var stats_label: Label = $GameHUD/%StatsLabel
+@onready var input_box: LineEdit = $GameHUD/%InputBox
+@onready var affection_bar: ProgressBar = $GameHUD/%AffectionBar
+@onready var pressure_bar: Control = $GameHUD/%PressureBar
+@onready var numbness_bar: Control = $GameHUD/%NumbnessBar
+@onready var time_bar: Control = $GameHUD/TimeBar
+@onready var feedback_label: Label = $GameHUD/%FeedbackLabel
+@onready var pause_overlay: ColorRect = $PauseOverlay
 var feedback_tween: Tween
-@onready var text_fx_root: Node2D = $Stage/TextFx
+@onready var text_fx_root: Node2D = $GameHUD/Stage/TextFx
 @onready var story_overlay: Control = $StoryOverlay
 @onready var voice_player: Node = $Voice
 @onready var bgm_player: Node = $Bgm
 @onready var sfx_player: Node = $Sfx
 @onready var hud_layout: Node = $HudLayout
-@onready var circle_fx: Control = %CircleFx
-@onready var mood_layer: Control = %MoodLayer
-@onready var phase2_room: Control = %Phase2Room
-@onready var parents_flash: Control = %ParentsFlash
-@onready var phase3_gallery: Control = %Phase3Gallery
+@onready var circle_fx: Control = $GameHUD/%CircleFx
+@onready var mood_layer: Control = $GameHUD/%MoodLayer
+@onready var phase2_room: Control = $GameHUD/%Phase2Room
+@onready var parents_flash: Control = $GameHUD/%ParentsFlash
+@onready var phase3_gallery: Control = $GameHUD/%Phase3Gallery
 @onready var ambient: Node = $Ambient
 @onready var stress_audio: Node = $StressAudio
-@onready var tears_fx: Control = %TearsFx
-@onready var p3_tears: Control = %Phase3TearsFx
+@onready var tears_fx: Control = $GameHUD/%TearsFx
+@onready var p3_tears: Control = $GameHUD/%Phase3TearsFx
 
 # ---- 剧情流程 ----
 # 五段剧情的统一叫法与 BGM 对应：
@@ -215,10 +215,8 @@ func _ready() -> void:
 	input_box.text_changed.connect(_on_text_changed)
 	story_overlay.finished.connect(_on_story_finished)
 	_hide_stat_labels()
-	_create_main_menu()
-	_build_pause_menu()
-	_build_tutorial_overlay()
-	_build_ending_layer()
+	var credits: Label = $EndingLayer/Roll/Credits
+	_ending_content_h = credits.get_minimum_size().y
 	_show_menu()
 	if bgm_player != null:
 		bgm_player.play("res://audio/bgm/intro_circulation.mp3")
@@ -399,98 +397,6 @@ func _apply_font_to_static_labels() -> void:
 			pass
 
 
-## Ending 画面：半透明黑底 + 白字从下往上飘
-func _build_ending_layer() -> void:
-	_ending_layer = Control.new()
-	_ending_layer.name = "EndingLayer"
-	_ending_layer.z_index = 45
-	_ending_layer.mouse_filter = Control.MOUSE_FILTER_STOP
-	_ending_layer.visible = false
-	add_child(_ending_layer)
-	_ending_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-
-	var vp := get_viewport_rect().size
-
-	# 半透明黑底
-	var scrim := ColorRect.new()
-	scrim.name = "Scrim"
-	scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scrim.color = Color(0.0, 0.0, 0.0, 0.74)
-	scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_ending_layer.add_child(scrim)
-
-	# 滚动容器：手动算每一行的 y，避免 VBox 在滚动容器里算不出高度
-	_ending_roll = Control.new()
-	_ending_roll.name = "Roll"
-	_ending_roll.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_ending_layer.add_child(_ending_roll)
-
-	var font := _game_font_resource()
-	const FS := 25
-	const LINE_H := 46.0
-	var col_w := vp.x * 0.72
-	var col_x := vp.x * 0.14
-	var y := 0.0
-	for raw in EndingText.LINES:
-		var text := String(raw)
-		if text != "":
-			var l := Label.new()
-			l.text = text
-			l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			if font != null:
-				l.add_theme_font_override("font", font)
-			l.add_theme_font_size_override("font_size", FS)
-			l.add_theme_color_override("font_color", Color(0.95, 0.94, 0.90, 0.95))
-			l.position = Vector2(col_x, y)
-			l.size = Vector2(col_w, LINE_H)
-			_ending_roll.add_child(l)
-		y += LINE_H
-	_ending_content_h = y
-
-	# 底部渐变暗带 + 跳过提示
-	var foot := TextureRect.new()
-	foot.name = "FootGrad"
-	foot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	foot.anchor_left = 0.0
-	foot.anchor_right = 1.0
-	foot.anchor_top = 1.0
-	foot.anchor_bottom = 1.0
-	foot.offset_top = -100.0
-	foot.offset_bottom = 0.0
-	var g := Gradient.new()
-	g.set_color(0, Color(0, 0, 0, 0.0))
-	g.set_color(1, Color(0, 0, 0, 0.9))
-	var gt := GradientTexture2D.new()
-	gt.gradient = g
-	gt.fill_from = Vector2(0, 0)
-	gt.fill_to = Vector2(0, 1)
-	foot.texture = gt
-	_ending_layer.add_child(foot)
-
-	var hint := Label.new()
-	hint.name = "SkipHint"
-	hint.text = "空格 / 回车 / 点击 跳过"
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if font != null:
-		hint.add_theme_font_override("font", font)
-	hint.add_theme_font_size_override("font_size", 17)
-	hint.add_theme_color_override("font_color", Color(0.72, 0.72, 0.70, 0.95))
-	# 放右上角，避免和滚动文字打架
-	hint.anchor_left = 1.0
-	hint.anchor_right = 1.0
-	hint.anchor_top = 0.0
-	hint.anchor_bottom = 0.0
-	hint.offset_left = -320.0
-	hint.offset_right = -24.0
-	hint.offset_top = 18.0
-	hint.offset_bottom = 46.0
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_ending_layer.add_child(hint)
-
-
 ## 播放 Ending 滚动。全部滚完会自动进结算画面。
 func _play_ending_roll() -> void:
 	if _ending_layer == null:
@@ -537,114 +443,6 @@ func _skip_ending() -> void:
 	_on_ending_finished()
 
 
-## 游戏内的操作说明浮层（第一次进入时弹一次）
-func _build_tutorial_overlay() -> void:
-	_tutorial_layer = Control.new()
-	_tutorial_layer.name = "TutorialLayer"
-	_tutorial_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_tutorial_layer.z_index = 55
-	_tutorial_layer.mouse_filter = Control.MOUSE_FILTER_STOP
-	_tutorial_layer.visible = false
-	add_child(_tutorial_layer)
-	_tutorial_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-
-	var scrim := ColorRect.new()
-	scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scrim.color = Color(0.02, 0.03, 0.04, 0.72)
-	scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_tutorial_layer.add_child(scrim)
-
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_tutorial_layer.add_child(center)
-
-	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(760, 0)
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.035, 0.04, 0.04, 0.97)
-	style.border_color = Color(1.0, 0.94, 0.0, 0.6)
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(10)
-	style.content_margin_left = 36.0
-	style.content_margin_right = 36.0
-	style.content_margin_top = 26.0
-	style.content_margin_bottom = 24.0
-	panel.add_theme_stylebox_override("panel", style)
-	center.add_child(panel)
-
-	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 8)
-	panel.add_child(vb)
-
-	var font := _game_font_resource()
-
-	var head := Label.new()
-	head.text = "操作说明"
-	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	if font != null:
-		head.add_theme_font_override("font", font)
-	head.add_theme_font_size_override("font_size", 30)
-	head.add_theme_color_override("font_color", Color(0.97, 0.95, 0.90))
-	vb.add_child(head)
-
-	var lines := [
-		"· 屏幕上会出现一句话，把它完整打出来就算「接住」",
-		"· 打错要整句重打",
-		"",
-		"· 按住 Alt 可以抵抗跳过这句话 —— 这是最重要的操作",
-		"    抵抗不涨压力，但会让你越来越麻木",
-		"    麻木满了，就再也听不见了",
-		"",
-		"· 左边竖条是剩余时间，右边两条是压力与麻木",
-		"    压力满了会崩溃，麻木满了会聋掉，任一满就结束",
-		"· 压力高的时候，不要硬扛，按住 Alt 跳过",
-		"",
-		"· Esc 打开暂停菜单（继续 / 设置 / 回主界面）",
-		"· 打字方式（拼音 / 汉字）可在「设置」里切换",
-	]
-	for t in lines:
-		var l := Label.new()
-		l.text = t
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		l.custom_minimum_size = Vector2(620, 24)
-		if font != null:
-			l.add_theme_font_override("font", font)
-		l.add_theme_font_size_override("font_size", 18)
-		l.add_theme_color_override("font_color", Color(0.88, 0.87, 0.82))
-		vb.add_child(l)
-
-	var tip := Label.new()
-	tip.text = "按 空格 / 回车 或点下面按钮开始"
-	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	if font != null:
-		tip.add_theme_font_override("font", font)
-	tip.add_theme_font_size_override("font_size", 16)
-	tip.add_theme_color_override("font_color", Color(0.70, 0.70, 0.66))
-	vb.add_child(tip)
-
-	var ok := Button.new()
-	ok.text = "明白了，开始"
-	ok.custom_minimum_size = Vector2(260, 50)
-	ok.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	ok.focus_mode = Control.FOCUS_NONE
-	if font != null:
-		ok.add_theme_font_override("font", font)
-	ok.add_theme_font_size_override("font_size", 24)
-	ok.add_theme_color_override("font_color", Color(1.0, 0.96, 0.84))
-	var st := StyleBoxFlat.new()
-	st.bg_color = Color(1, 1, 1, 0.08)
-	st.border_color = Color(1.0, 0.94, 0.0, 0.5)
-	st.set_border_width_all(1)
-	st.set_corner_radius_all(6)
-	ok.add_theme_stylebox_override("normal", st)
-	var hv := st.duplicate() as StyleBoxFlat
-	hv.bg_color = Color(1, 1, 1, 0.16)
-	ok.add_theme_stylebox_override("hover", hv)
-	ok.pressed.connect(_close_tutorial)
-	vb.add_child(ok)
-
-
 func _maybe_show_tutorial() -> void:
 	if _tutorial_layer == null:
 		return
@@ -672,45 +470,6 @@ func _close_tutorial() -> void:
 	call_deferred("_place_cursor_after_layout")
 	if input_box.editable:
 		input_box.call_deferred("grab_focus")
-
-
-## 构建暂停菜单的四颗按钮（继续 / 设置 / 回主界面 / 离开）
-func _build_pause_menu() -> void:
-	var contents := pause_overlay.get_node_or_null("Center/PauseCard/PauseContents")
-	if contents == null:
-		return
-	var hint := contents.get_node_or_null("PauseHint") as Label
-	if hint != null:
-		hint.text = "Esc 继续对话 · 下面是菜单"
-
-	var specs := [
-		["继续游戏", _resume_game],
-		["设置", _open_pause_settings],
-		["返回主界面", _return_to_menu],
-		["离开游戏", _quit_game],
-	]
-	for it in specs:
-		var b := Button.new()
-		b.text = String(it[0])
-		b.custom_minimum_size = Vector2(300, 46)
-		b.focus_mode = Control.FOCUS_NONE
-		var font := _game_font_resource()
-		if font != null:
-			b.add_theme_font_override("font", font)
-		b.add_theme_font_size_override("font_size", 24)
-		b.add_theme_color_override("font_color", Color(0.93, 0.90, 0.84))
-		b.add_theme_color_override("font_hover_color", Color(1.0, 0.96, 0.78))
-		var st := StyleBoxFlat.new()
-		st.bg_color = Color(1, 1, 1, 0.05)
-		st.border_color = Color(1.0, 0.94, 0.0, 0.35)
-		st.set_border_width_all(1)
-		st.set_corner_radius_all(6)
-		b.add_theme_stylebox_override("normal", st)
-		var hv := st.duplicate() as StyleBoxFlat
-		hv.bg_color = Color(1, 1, 1, 0.14)
-		b.add_theme_stylebox_override("hover", hv)
-		b.pressed.connect(it[1])
-		contents.add_child(b)
 
 
 func _pause_game() -> void:
@@ -777,38 +536,15 @@ func _quit_game() -> void:
 	get_tree().quit()
 
 
-## 创建主界面（代码生成，不改场景文件）
 ## 永久隐藏顶部「第 X / 30 句」和「分数/准确率/最快」这两块统计
 func _hide_stat_labels() -> void:
 	if round_label != null:
 		round_label.visible = false
 	if stats_label != null:
 		stats_label.visible = false
-	var sb := get_node_or_null("StatsBack")
+	var sb := get_node_or_null("GameHUD/StatsBack")
 	if sb != null:
 		sb.visible = false
-
-
-func _create_main_menu() -> void:
-	var script_res := load("res://scripts/main_menu.gd")
-	if script_res == null:
-		push_warning("Main: 找不到 main_menu.gd，直接进标题态")
-		_show_title()
-		return
-	main_menu = Control.new()
-	main_menu.set_script(script_res)
-	main_menu.name = "MainMenu"
-	main_menu.z_index = 60
-	add_child(main_menu)
-	# 程序化创建的 Control 默认尺寸是 0，必须显式铺满，
-	# 否则背景图和按钮都会按 0 尺寸布局（挤在左上角）
-	main_menu.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	main_menu.offset_left = 0.0
-	main_menu.offset_top = 0.0
-	main_menu.offset_right = 0.0
-	main_menu.offset_bottom = 0.0
-	main_menu.start_pressed.connect(_on_menu_start)
-	main_menu.quit_pressed.connect(_on_menu_quit)
 
 
 func _on_menu_start(mode: String) -> void:
@@ -843,12 +579,12 @@ func _show_menu() -> void:
 ## 对局 HUD 的整体显隐（主界面用）
 func _set_game_hud_visible(on: bool) -> void:
 	for node in [time_bar, pressure_bar, numbness_bar,
-			get_node_or_null("TimeCaption"),
-			get_node_or_null("PressureCaption"),
-			get_node_or_null("NumbnessCaption"),
-			get_node_or_null("%SentencePanel"),
+			get_node_or_null("GameHUD/TimeCaption"),
+			get_node_or_null("GameHUD/PressureCaption"),
+			get_node_or_null("GameHUD/NumbnessCaption"),
+			get_node_or_null("GameHUD/%SentencePanel"),
 			circle_fx, tears_fx, p3_tears,
-			get_node_or_null("Stage"), get_node_or_null("Backdrop")]:
+			get_node_or_null("GameHUD/Stage"), get_node_or_null("GameHUD/Backdrop")]:
 		if node != null:
 			node.visible = on
 	if on:
@@ -871,30 +607,9 @@ func _set_game_hud_visible(on: bool) -> void:
 		title_label.visible = false
 
 
-func _show_title() -> void:
-	phase = "title"
-	pause_overlay.hide()
-	feedback_label.hide()
-	cursor_rect.hide()
-	state_label.text = "第一场 · 面对一段对话"
-	sentence_label.text = "选择打字方式，接住那些向你靠近的句子。"
-	sentence_label.show()
-	hanzi_row.hide()
-	pinyin_row.hide()
-	input_box.show()
-	input_box.text = ""
-	_last_input_length = 0  # 换句/进剧情时同步重置击键计数
-	input_box.editable = false
-	if round_label != null and false:
-		round_label.text = "1 汉字   2 拼音"
-	_refresh_stats()
-	_update_bars()
-	_clear_curved_text()
-	story_overlay.hide()
-	story_seen.clear()
-
-
 func _start_game(mode: String) -> void:
+	$GameHUD/SentencePanel/ResultPanel.hide()
+	$GameHUD/SentencePanel/Contents.show()
 	input_mode = mode
 	pause_overlay.hide()
 	feedback_label.hide()
@@ -903,14 +618,20 @@ func _start_game(mode: String) -> void:
 	phase = "playing"
 	round_number = 0
 	affection = 0.0
-	if has_node("%CircleFx"):
-		%CircleFx.hide_now()
+	if has_node("GameHUD/%CircleFx"):
+		circle_fx.hide_now()
 	if mood_layer != null:
 		mood_layer.reset()
 	if phase2_room != null:
 		phase2_room.reset()
 	if phase3_gallery != null:
 		phase3_gallery.reset()
+	if _dialog_home_rect.has_area():
+		var panel: Control = $GameHUD/%SentencePanel
+		panel.position = _dialog_home_rect.position
+		panel.size = _dialog_home_rect.size
+		if _dialog_home_style != null:
+			panel.add_theme_stylebox_override("panel", _dialog_home_style)
 	_dialog_home_rect = Rect2()
 	_dialog_hidden_p3 = false
 	_phase3_first_round = -1
@@ -1419,7 +1140,7 @@ func _layout_sentence() -> void:
 	var row: Control = hanzi_row if input_mode == "hanzi" else pinyin_row
 	if not row.visible:
 		return
-	var lane: Control = %SentenceLane
+	var lane: Control = $GameHUD/%SentenceLane
 	# FlowContainer 需要明确宽度才能正确折行；折行后按实际高度撑开 lane，
 	# 否则第二行会被后面的控件压住（看起来像"溢出"）
 	# 宽度必须先定，否则 FlowContainer 会按"每行一个字"算高度，得出天文数字
@@ -1703,17 +1424,15 @@ func _end_game(won: bool) -> void:
 	input_box.text = ""
 	_last_input_length = 0  # 换句/进剧情时同步重置击键计数
 	pinyin_row.hide()
-	sentence_label.show()
-	sentence_label.text = "你接住她们了" if won else (_game_over_text if _game_over_text != "" else "这场对话暂时结束了。")
-	# 结算提示：顶部的 RoundLabel 已隐藏，所以把提示放在状态行
-	state_label.visible = true
-	if won:
-		state_label.text = "胜利 · R 重玩   1 汉字   2 拼音   Esc 回主界面"
-	else:
-		state_label.text = "失败 · R 重玩   1 汉字   2 拼音   Esc 回主界面"
+	var message := "你接住她们了" if won else (_game_over_text if _game_over_text != "" else "这场对话暂时结束了。")
+	var result: Control = $GameHUD/SentencePanel/ResultPanel
+	result.get_node("Message").text = message
+	result.get_node("Outcome").text = "胜利 · 好感度已满" if won else "失败"
+	$GameHUD/SentencePanel/Contents.hide()
+	result.show()
 	_save_records()
 	_refresh_stats()
-	_spawn_curved_banner(sentence_label.text, "positive" if won else "cold", 7.0)
+	_spawn_curved_banner(message, "positive" if won else "cold", 7.0)
 
 
 func _update_bars() -> void:
@@ -1759,7 +1478,7 @@ func _show_feedback(message: String, color: Color) -> void:
 		feedback_tween.kill()
 	# 第三阶段面板在屏幕中央，反馈文字要挪到面板下方，别压住内容
 	if _dialog_hidden_p3:
-		var panel: Control = %SentencePanel
+		var panel: Control = $GameHUD/%SentencePanel
 		if panel != null:
 			feedback_label.anchor_top = 0.0
 			feedback_label.anchor_bottom = 0.0
@@ -2097,7 +1816,7 @@ func _play_sentence_voice() -> void:
 
 var _last_input_length := 0
 ## 主界面（开始游戏 / 设置 / 离开）
-var main_menu: Control = null
+@onready var main_menu: Control = $MainMenu
 ## 暂停菜单里是否开着设置浮层
 var _pause_settings_open := false
 ## 暂停前处于哪个 phase（playing / final），恢复时要用
@@ -2105,10 +1824,10 @@ var _paused_from := "playing"
 ## 本局是否已经提醒过「用 Alt 抵抗」
 var _alt_hint_shown := false
 ## 游戏内的操作说明浮层
-var _tutorial_layer: Control = null
+@onready var _tutorial_layer: Control = $TutorialLayer
 ## Ending 画面（半透明黑底 + 白字上飘）
-var _ending_layer: Control = null
-var _ending_roll: Control = null
+@onready var _ending_layer: Control = $EndingLayer
+@onready var _ending_roll: Control = $EndingLayer/Roll
 var _ending_tween: Tween = null
 var _ending_content_h := 0.0
 ## 失败原因（显示在文本框里）
@@ -2164,9 +1883,9 @@ func _start_final_phase() -> void:
 ## 隐藏 / 恢复「压力、麻木、时间」三组 HUD
 func _set_final_hud(hide_them: bool) -> void:
 	for node in [time_bar, pressure_bar, numbness_bar,
-			get_node_or_null("TimeCaption"),
-			get_node_or_null("PressureCaption"),
-			get_node_or_null("NumbnessCaption")]:
+			get_node_or_null("GameHUD/TimeCaption"),
+			get_node_or_null("GameHUD/PressureCaption"),
+			get_node_or_null("GameHUD/NumbnessCaption")]:
 		if node != null:
 			node.visible = not hide_them
 
@@ -2403,7 +2122,7 @@ func _fit_curved_font_size(body: String, base: int, minimum: int) -> int:
 
 ## 画面窗口（Stage）当前的像素尺寸
 func _stage_size() -> Vector2:
-	var stage_node := get_node_or_null("Stage") as Control
+	var stage_node := get_node_or_null("GameHUD/Stage") as Control
 	if stage_node != null and stage_node.size.x > 1.0:
 		return stage_node.size
 	return Vector2(600.0, 460.0)
@@ -2434,7 +2153,7 @@ func _center_row_content(row: Control, lane: Control, available: float) -> void:
 
 ## 对话框内容区的实际像素尺寸（考虑版式缩放与 Panel 内边距）
 func _dialog_inner_size() -> Vector2:
-	var panel: Control = %SentencePanel
+	var panel: Control = $GameHUD/%SentencePanel
 	if panel == null or panel.size.x <= 1.0:
 		return Vector2(804.0, 153.0)
 	var pad := Vector2.ZERO
@@ -2447,12 +2166,12 @@ func _dialog_inner_size() -> Vector2:
 
 ## 对话框里留给"字格区域"的高度：扣掉状态行、输入框、VBox 间距、Panel 内边距。
 func _lane_available_height() -> float:
-	var panel: Control = %SentencePanel
+	var panel: Control = $GameHUD/%SentencePanel
 	if panel == null or panel.size.y <= 1.0:
 		return 100.0
 	var contents: Control = panel.get_node_or_null("Contents")
-	var state: Control = %StateLabel
-	var input: Control = %InputBox
+	var state: Control = $GameHUD/%StateLabel
+	var input: Control = $GameHUD/%InputBox
 
 	var pad := 0.0
 	var sb := panel.get_theme_stylebox("panel")
@@ -2630,8 +2349,8 @@ func _update_mood_layer() -> void:
 		if want_gallery3:
 			phase3_gallery.set_progress(_stage3_progress())
 
-	# 占位的「……」已经不需要了（二阶段有真实立绘），一律隐藏
-	var presence := get_node_or_null("Stage/Clip/BossArea/Presence") as Control
+	# 二阶段有真实立绘了，占位的「……」就不用了
+	var presence := get_node_or_null("GameHUD/Stage/Clip/BossArea/Presence") as Control
 	if presence != null:
 		presence.visible = false
 
@@ -2858,7 +2577,7 @@ func _notify_phase3_first_done() -> void:
 ##   把 SentencePanel 从「底部横条」变成「屏幕中央的大面板」
 ##   —— 汉字格 / 拼音格 / 输入框都在里面，平直显示，带输入反馈
 func _promote_dialog_center(promote: bool) -> void:
-	var panel: Control = %SentencePanel
+	var panel: Control = $GameHUD/%SentencePanel
 	if panel == null:
 		return
 	if _dialog_swing_tween != null and _dialog_swing_tween.is_valid():
@@ -2971,7 +2690,7 @@ func _apply_outline_recursive(node: Node, color: Color) -> void:
 
 ## 瞬时把对话框设到「中央」状态（换句复位后立即推回去）
 func _apply_dialog_hidden_instant() -> void:
-	var panel: Control = %SentencePanel
+	var panel: Control = $GameHUD/%SentencePanel
 	if panel == null or _dialog_home_rect.size.x <= 0.0:
 		return
 	if not _dialog_hidden_p3:
@@ -2996,7 +2715,7 @@ func _apply_dialog_hidden_instant() -> void:
 func _fit_panel_height_to_content() -> void:
 	if not _dialog_hidden_p3:
 		return
-	var panel: Control = %SentencePanel
+	var panel: Control = $GameHUD/%SentencePanel
 	if panel == null:
 		return
 	_apply_input_box_visibility()   # 不参与测量
@@ -3057,7 +2776,7 @@ func _refit_flow_geometry() -> void:
 	var row: Control = hanzi_row if input_mode == "hanzi" else pinyin_row
 	if row == null or not row.visible:
 		return
-	var lane: Control = %SentenceLane
+	var lane: Control = $GameHUD/%SentenceLane
 
 	# 第一步：撑开，让所有行都排出来（不被裁剪）
 	var wide: float = 900.0

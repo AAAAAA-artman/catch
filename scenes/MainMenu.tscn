@@ -1,0 +1,365 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/main_menu.gd" id="1_ow34m"]
+[ext_resource type="Texture2D" path="res://art/ui/menu_bg.jpg" id="2_l72w3"]
+[ext_resource type="Shader" path="res://shaders/title_gradient.gdshader" id="3_826wr"]
+[ext_resource type="FontFile" path="res://fonts/nanodasong.ttf" id="4_ucygd"]
+
+[sub_resource type="Gradient" id="Gradient_mipys"]
+colors = PackedColorArray(0, 0, 0, 0, 0, 0, 0, 0.55)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_8a8k8"]
+gradient = SubResource("Gradient_mipys")
+fill_to = Vector2(0, 1)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_7la6k"]
+resource_local_to_scene = true
+shader = ExtResource("3_826wr")
+shader_parameter/band_top = 0.05
+shader_parameter/band_bottom = 0.3
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_2nypq"]
+bg_color = Color(1, 1, 1, 0.12)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bky6r"]
+bg_color = Color(1, 1, 1, 0.06)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_l4mxc"]
+bg_color = Color(1, 1, 1, 0.12)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_5faoh"]
+bg_color = Color(1, 1, 1, 0.06)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ptake"]
+bg_color = Color(1, 1, 1, 0.12)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hubol"]
+bg_color = Color(1, 1, 1, 0.06)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_8vx4p"]
+content_margin_left = 34.0
+content_margin_top = 26.0
+content_margin_right = 34.0
+content_margin_bottom = 26.0
+bg_color = Color(0.035, 0.04, 0.04, 0.97)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.94, 0, 0.55)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tdapf"]
+bg_color = Color(1, 1, 1, 0.08)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.94, 0, 0.45)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_v41fp"]
+bg_color = Color(1, 1, 1, 0.16)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.94, 0, 0.45)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7shrw"]
+bg_color = Color(1, 1, 1, 0.08)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.94, 0, 0.45)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_viowm"]
+bg_color = Color(1, 1, 1, 0.16)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.94, 0, 0.45)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1n6yq"]
+bg_color = Color(1, 1, 1, 0.08)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.94, 0, 0.45)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_yovvs"]
+bg_color = Color(1, 1, 1, 0.16)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.94, 0, 0.45)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[node name="MainMenu" type="Control" unique_id=1125818227]
+z_index = 60
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_ow34m")
+
+[node name="Bg" type="TextureRect" parent="." unique_id=1179960700]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+texture = ExtResource("2_l72w3")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Dim" type="TextureRect" parent="." unique_id=348285136]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+texture = SubResource("GradientTexture2D_8a8k8")
+
+[node name="Title" type="Label" parent="." unique_id=1253546103]
+material = SubResource("ShaderMaterial_7la6k")
+layout_mode = 0
+anchor_right = 1.0
+offset_top = 40.0
+offset_bottom = 260.0
+theme_override_fonts/font = ExtResource("4_ucygd")
+theme_override_font_sizes/font_size = 148
+text = "接住"
+horizontal_alignment = 1
+
+[node name="Buttons" type="VBoxContainer" parent="." unique_id=1263802136]
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -190.0
+offset_top = -4.0
+offset_right = 190.0
+offset_bottom = 340.0
+theme_override_constants/separation = 48
+
+[node name="Start" type="Button" parent="Buttons" unique_id=2089643789]
+custom_minimum_size = Vector2(380, 68)
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(0.94, 0.92, 0.86, 0.92)
+theme_override_colors/font_pressed_color = Color(1, 0.94, 0.7, 1)
+theme_override_colors/font_hover_color = Color(1, 0.97, 0.8, 1)
+theme_override_fonts/font = ExtResource("4_ucygd")
+theme_override_font_sizes/font_size = 38
+theme_override_styles/pressed = SubResource("StyleBoxFlat_2nypq")
+theme_override_styles/hover = SubResource("StyleBoxFlat_bky6r")
+text = "开始游戏"
+flat = true
+
+[node name="SettingsButton" type="Button" parent="Buttons" unique_id=96776601]
+custom_minimum_size = Vector2(380, 68)
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(0.94, 0.92, 0.86, 0.92)
+theme_override_colors/font_pressed_color = Color(1, 0.94, 0.7, 1)
+theme_override_colors/font_hover_color = Color(1, 0.97, 0.8, 1)
+theme_override_fonts/font = ExtResource("4_ucygd")
+theme_override_font_sizes/font_size = 38
+theme_override_styles/pressed = SubResource("StyleBoxFlat_l4mxc")
+theme_override_styles/hover = SubResource("StyleBoxFlat_5faoh")
+text = "设置"
+flat = true
+
+[node name="Quit" type="Button" parent="Buttons" unique_id=1712636808]
+custom_minimum_size = Vector2(380, 68)
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(0.94, 0.92, 0.86, 0.92)
+theme_override_colors/font_pressed_color = Color(1, 0.94, 0.7, 1)
+theme_override_colors/font_hover_color = Color(1, 0.97, 0.8, 1)
+theme_override_fonts/font = ExtResource("4_ucygd")
+theme_override_font_sizes/font_size = 38
+theme_override_styles/pressed = SubResource("StyleBoxFlat_ptake")
+theme_override_styles/hover = SubResource("StyleBoxFlat_hubol")
+text = "离开"
+flat = true
+
+[node name="Settings" type="Panel" parent="." unique_id=1426373266]
+visible = false
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -260.0
+offset_top = -190.0
+offset_right = 260.0
+offset_bottom = 190.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_8vx4p")
+
+[node name="Contents" type="VBoxContainer" parent="Settings" unique_id=1075304293]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 34.0
+offset_top = 26.0
+offset_right = -34.0
+offset_bottom = -26.0
+theme_override_constants/separation = 22
+
+[node name="Heading" type="Label" parent="Settings/Contents" unique_id=2099728377]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.97, 0.95, 0.9, 1)
+theme_override_fonts/font = ExtResource("4_ucygd")
+theme_override_font_sizes/font_size = 32
+text = "设置"
+horizontal_alignment = 1
+
+[node name="Volume" type="HBoxContainer" parent="Settings/Contents" unique_id=855740821]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Caption" type="Label" parent="Settings/Contents/Volume" unique_id=1412151341]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.9, 0.85, 1)
+theme_override_fonts/font = ExtResource("4_ucygd")
+theme_override_font_sizes/font_size = 26
+text = "音量"
+
+[node name="Slider" type="HSlider" parent="Settings/Contents/Volume" unique_id=1475804304]
+custom_minimum_size = Vector2(230, 34)
+layout_mode = 2
+size_flags_horizontal = 3
+value = 80.0
+
+[node name="Value" type="Label" parent="Settings/Contents/Volume" unique_id=1388515698]
+custom_minimum_size = Vector2(56, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.92, 0.8, 1)
+theme_override_fonts/font = ExtResource("4_ucygd")
+theme_override_font_sizes/font_size = 22
+text = "80"
+horizontal_alignment = 2
+
+[node name="Fullscreen" type="HBoxContainer" parent="Settings/Contents" unique_id=1278189019]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Caption" type="Label" parent="Settings/Contents/Fullscreen" unique_id=1814127356]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.9, 0.85, 1)
+theme_override_fonts/font = ExtResource("4_ucygd")
+theme_override_font_sizes/font_size = 26
+text = "全屏"
+
+[node name="Toggle" type="Button" parent="Settings/Contents/Fullscreen" unique_id=857781688]
+custom_minimum_size = Vector2(120, 40)
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(1, 0.96, 0.84, 1)
+theme_override_fonts/font = ExtResource("4_ucygd")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxFlat_tdapf")
+theme_override_styles/hover = SubResource("StyleBoxFlat_v41fp")
+text = "关"
+
+[node name="Mode" type="HBoxContainer" parent="Settings/Contents" unique_id=623131535]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Caption" type="Label" parent="Settings/Contents/Mode" unique_id=1386322972]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.9, 0.85, 1)
+theme_override_fonts/font = ExtResource("4_ucygd")
+theme_override_font_sizes/font_size = 26
+text = "模式"
+
+[node name="Toggle" type="Button" parent="Settings/Contents/Mode" unique_id=680637089]
+custom_minimum_size = Vector2(120, 40)
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(1, 0.96, 0.84, 1)
+theme_override_fonts/font = ExtResource("4_ucygd")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxFlat_7shrw")
+theme_override_styles/hover = SubResource("StyleBoxFlat_viowm")
+text = "拼音"
+
+[node name="Tip" type="Label" parent="Settings/Contents" unique_id=1849152537]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.72, 0.72, 0.68, 1)
+theme_override_fonts/font = ExtResource("4_ucygd")
+theme_override_font_sizes/font_size = 17
+text = "（模式决定进入游戏后的打字方式）"
+
+[node name="Back" type="Button" parent="Settings/Contents" unique_id=199034561]
+custom_minimum_size = Vector2(200, 46)
+layout_mode = 2
+size_flags_horizontal = 4
+focus_mode = 0
+theme_override_colors/font_color = Color(1, 0.96, 0.84, 1)
+theme_override_fonts/font = ExtResource("4_ucygd")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxFlat_1n6yq")
+theme_override_styles/hover = SubResource("StyleBoxFlat_yovvs")
+text = "返回"
+
+[connection signal="pressed" from="Buttons/Start" to="." method="_on_start"]
+[connection signal="pressed" from="Buttons/SettingsButton" to="." method="_on_open_settings"]
+[connection signal="pressed" from="Buttons/Quit" to="." method="_on_quit"]
+[connection signal="pressed" from="Settings/Contents/Fullscreen/Toggle" to="." method="_on_toggle_fullscreen"]
+[connection signal="pressed" from="Settings/Contents/Mode/Toggle" to="." method="_on_toggle_mode"]
+[connection signal="pressed" from="Settings/Contents/Back" to="." method="_close_settings"]
+[connection signal="value_changed" from="Settings/Contents/Volume/Slider" to="." method="_on_volume_changed"]

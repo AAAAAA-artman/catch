@@ -34,15 +34,13 @@ const SWAP_FADE := 1.1
 ## 摇晃
 const SHAKE_AMPLITUDE := 3.6
 const SHAKE_SPEED := 1.15
-## 容器要比画框大一点，摇晃时才不会露边
-const BLEED := 10.0
 
 var _progress := 0.0
 var _shown_brightness := 1.0
 
-var _holder: Control
-var _base: TextureRect
-var _over: TextureRect
+@onready var _holder: Control = $Holder
+@onready var _base: TextureRect = $Holder/Base
+@onready var _over: TextureRect = $Holder/Overlay
 
 var _index := 0
 var _swap_timer := 0.0
@@ -55,38 +53,11 @@ var _active := false
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	_build()
 	_shown_brightness = 1.0
 	_apply_brightness()
 	_set_index(0)
 	_pick_next_interval()
 	visible = false
-
-
-func _build() -> void:
-	_holder = Control.new()
-	_holder.name = "Holder"
-	_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_holder.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_holder.offset_left = -BLEED
-	_holder.offset_top = -BLEED
-	_holder.offset_right = BLEED
-	_holder.offset_bottom = BLEED
-	add_child(_holder)
-
-	_base = _make_rect()
-	_holder.add_child(_base)
-	_over = _make_rect()
-	_holder.add_child(_over)
-
-
-func _make_rect() -> TextureRect:
-	var rect := TextureRect.new()
-	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
-	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	return rect
 
 
 func _load(index: int) -> Texture2D:

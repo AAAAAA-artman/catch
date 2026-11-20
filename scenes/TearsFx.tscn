@@ -1,0 +1,27 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/tears_fx.gd" id="1_0v4dy"]
+[ext_resource type="Shader" path="res://shaders/tears.gdshader" id="2_ica0h"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_vd1kl"]
+resource_local_to_scene = true
+shader = ExtResource("2_ica0h")
+shader_parameter/strength = 0.0
+
+[node name="TearsFx" type="Control" unique_id=1064608501]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_0v4dy")
+
+[node name="TearRect" type="ColorRect" parent="." unique_id=1535071169]
+visible = false
+material = SubResource("ShaderMaterial_vd1kl")
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2

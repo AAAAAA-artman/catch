@@ -25,7 +25,7 @@ const FADE_OUT := 1.6
 ## play_once 时中间停留多久
 const HOLD := 3.0
 
-var _tex: TextureRect
+@onready var _tex: TextureRect = $Flash
 var _tween: Tween = null
 var _visible_now := false
 var _alpha := 0.0
@@ -37,16 +37,8 @@ func _ready() -> void:
 	# 根节点必须保持可见（否则子节点不渲染）
 	visible = true
 
-	_tex = TextureRect.new()
-	_tex.name = "Flash"
-	_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_tex.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	_tex.modulate = Color(DIM, DIM, DIM, 0.0)
 	if ResourceLoader.exists(IMAGE_PATH):
 		_tex.texture = load(IMAGE_PATH)
-	add_child(_tex)
 
 
 ## 淡入并保持（进入特殊句期间调用）
