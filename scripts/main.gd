@@ -310,6 +310,9 @@ func _input(event: InputEvent) -> void:
 		elif phase == "paused":
 			_resume_game()
 			accept_event()
+		elif phase == "won" or phase == "lost":
+			_return_to_menu()
+			accept_event()
 		return
 	if phase == "menu":
 		# 主界面里 Esc 关闭设置面板
@@ -1671,9 +1674,12 @@ func _end_game(won: bool) -> void:
 	pinyin_row.hide()
 	sentence_label.show()
 	sentence_label.text = "你接住她们了" if won else (_game_over_text if _game_over_text != "" else "这场对话暂时结束了。")
-	state_label.text = "胜利 · 好感度已满" if won else "失败"
-	if round_label != null and false:
-		round_label.text = "R 重玩   1 汉字   2 拼音"
+	# 结算提示：顶部的 RoundLabel 已隐藏，所以把提示放在状态行
+	state_label.visible = true
+	if won:
+		state_label.text = "胜利 · R 重玩   1 汉字   2 拼音   Esc 回主界面"
+	else:
+		state_label.text = "失败 · R 重玩   1 汉字   2 拼音   Esc 回主界面"
 	_save_records()
 	_refresh_stats()
 	_spawn_curved_banner(sentence_label.text, "positive" if won else "cold", 7.0)
