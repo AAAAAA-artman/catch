@@ -45,17 +45,41 @@ var _intro_timer := 0.0
 var _intro_show_b := false
 var _expanded := false
 
-@onready var _root: Control = $Root
-@onready var _base: TextureRect = $Root/Base
-@onready var _cover: TextureRect = $Root/Cover
-@onready var _swap: TextureRect = $Root/Swap
+var _root: Control
+var _base: TextureRect
+var _cover: TextureRect
+var _swap: TextureRect
 var _fade_tween: Tween = null
 var _expand_tween: Tween = null
 
 
 func _ready() -> void:
-	_root.hide()
-	hide()
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	visible = false
+
+	_root = Control.new()
+	_root.name = "Root"
+	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_root)
+
+	_base = _make_rect()
+	_root.add_child(_base)
+	_cover = _make_rect()
+	_root.add_child(_cover)
+	_swap = _make_rect()
+	_root.add_child(_swap)
+	_root.visible = false
+
+
+func _make_rect() -> TextureRect:
+	var r := TextureRect.new()
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	r.modulate.a = 0.0
+	return r
 
 
 func _tex(i: int) -> Texture2D:

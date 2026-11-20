@@ -26,28 +26,29 @@ var _shown := 0.0
 var _fast_forward_elapsed := 0.0
 var _tween: Tween
 
-@onready var _bg: TextureRect = $Background
+var _bg: TextureRect
 var _bg_path := ""
 var _bg_tween: Tween
 ## 换图时的黑屏过渡层
-@onready var _blackout: ColorRect = $Blackout
+var _blackout: ColorRect
 ## 4:3 相框（剧情里插入的照片）
-@onready var _photo_frame: Panel = $PhotoFrame
-@onready var _photo: TextureRect = $PhotoFrame/Photo
+var _photo_frame: Panel
+var _photo: TextureRect
 var _photo_path := ""
 var _photo_anim: Tween
 ## 「信」的竖排呈现（epilogue 里的父母台词）
-@onready var _letter_layer: Control = $Letter
+var _letter_layer: Control = null
 var _letter_labels: Array = []
 var _letter_started := false
-@onready var _dim: ColorRect = $Dim
-@onready var _panel: PanelContainer = $Dialogue
-@onready var _speaker: Label = $Dialogue/Column/Speaker
-@onready var _text: Label = $Dialogue/Column/Text
-@onready var _hint: Label = $Dialogue/Column/Hint
+var _dim: ColorRect
+var _panel: PanelContainer
+var _speaker: Label
+var _text: Label
+var _hint: Label
 
 
 func _ready() -> void:
+	_build_ui()
 	visible = false
 	set_process(false)
 
@@ -132,8 +133,7 @@ func finish_now() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
 	modulate = Color(1.0, 1.0, 1.0, 1.0)
-	var completed_segment := _segment_id
-	finished.emit(completed_segment)
+	finished.emit(_segment_id)
 
 
 # ================================================================ 内部
@@ -344,10 +344,9 @@ func _finish() -> void:
 	_kill_tween()
 	_tween = create_tween()
 	_tween.tween_property(self, "modulate:a", 0.0, FADE_TIME)
-	var completed_segment := _segment_id
 	_tween.tween_callback(func() -> void:
 		visible = false
-		finished.emit(completed_segment)
+		finished.emit(_segment_id)
 	)
 
 
@@ -367,3 +366,125 @@ func _input(event: InputEvent) -> void:
 	if advance:
 		_advance()
 		get_viewport().set_input_as_handled()
+
+
+func _build_ui() -> void:
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	mouse_filter = Control.MOUSE_FILTER_STOP
+
+	# 背景图：铺满、保持比例裁切
+	_bg = TextureRect.new()
+	_bg.name = "Background"
+	_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_bg)
+
+	# 4:3 相框（默认隐藏）—— 和游戏里的画面框一样：黑底 + 黄色描边
+	_photo_frame = Panel.new()
+	_photo_frame.name = "PhotoFrame"
+	_photo_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_photo_frame.visible = false
+	var frame_style := StyleBoxFlat.new()
+	frame_style.bg_color = Color(0, 0, 0, 1)
+	frame_style.border_color = Color(1.0, 0.94, 0.0, 0.9)
+	frame_style.set_border_width_all(2)
+	_photo_frame.add_theme_stylebox_override("panel", frame_style)
+	add_child(_photo_frame)
+
+	_photo = TextureRect.new()
+	_photo.name = "Photo"
+	_photo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_photo.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_photo.offset_left = 2.0
+	_photo.offset_top = 2.0
+	_photo.offset_right = -2.0
+	_photo.offset_bottom = -2.0
+	_photo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_photo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_photo_frame.add_child(_photo)
+
+	# 「信」层：竖排白字，逐行向上堆叠（类似 ED）
+	_letter_layer = Control.new()
+	_letter_layer.name = "Letter"
+	_letter_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_letter_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_letter_layer.visible = false
+	add_child(_letter_layer)
+
+	# 暗底：信是白字，压在照片上必须压暗才能读
+	var letter_scrim := ColorRect.new()
+	letter_scrim.name = "Scrim"
+	letter_scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	letter_scrim.color = Color(0.0, 0.0, 0.0, 0.55)
+	letter_scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_letter_layer.add_child(letter_scrim)
+
+	# 黑屏过渡层：换背景 / 插照片时从这里过一下
+	_blackout = ColorRect.new()
+	_blackout.name = "Blackout"
+	_blackout.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_blackout.color = Color(0, 0, 0, 0)
+	_blackout.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_blackout)
+
+	# 压暗层：让底部对话框上的字更容易读
+	_dim = ColorRect.new()
+	_dim.name = "Dim"
+	_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_dim.color = Color(0.02, 0.02, 0.04, 0.26)
+	_dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_dim)
+
+	# 底部对话框
+	_panel = PanelContainer.new()
+	_panel.name = "Dialogue"
+	_panel.anchor_left = 0.0
+	_panel.anchor_top = 1.0
+	_panel.anchor_right = 1.0
+	_panel.anchor_bottom = 1.0
+	_panel.offset_left = 78.0
+	_panel.offset_top = -212.0
+	_panel.offset_right = -78.0
+	_panel.offset_bottom = -22.0
+	_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.035, 0.038, 0.055, 0.55)
+	style.border_color = Color(0.55, 0.52, 0.60, 0.45)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(10)
+	style.content_margin_left = 30.0
+	style.content_margin_right = 30.0
+	style.content_margin_top = 22.0
+	style.content_margin_bottom = 16.0
+	_panel.add_theme_stylebox_override("panel", style)
+	add_child(_panel)
+
+	var column := VBoxContainer.new()
+	column.name = "Column"
+	column.add_theme_constant_override("separation", 8)
+	_panel.add_child(column)
+
+	_speaker = Label.new()
+	_speaker.name = "Speaker"
+	_speaker.add_theme_font_size_override("font_size", 22)
+	_speaker.add_theme_color_override("font_color", Color("f7d292"))
+	column.add_child(_speaker)
+
+	_text = Label.new()
+	_text.name = "Text"
+	_text.add_theme_font_size_override("font_size", 27)
+	_text.add_theme_color_override("font_color", Color("fff3e8"))
+	_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(_text)
+
+	_hint = Label.new()
+	_hint.name = "Hint"
+	_hint.add_theme_font_size_override("font_size", 14)
+	_hint.add_theme_color_override("font_color", Color("8d8798"))
+	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	column.add_child(_hint)

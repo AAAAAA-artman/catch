@@ -73,25 +73,25 @@ var _last_tier := 3
 var _side_run := 0
 var _last_side := 0
 
-@onready var title_label: Label = %TitleLabel
-@onready var state_label: Label = %StateLabel
-@onready var round_label: Label = %RoundLabel
-@onready var sentence_label: RichTextLabel = %SentenceLabel
-@onready var hanzi_row: HFlowContainer = %HanziRow
-@onready var pinyin_row: HFlowContainer = %PinyinRow
-@onready var sentence_lane: Control = %SentenceLane
+@onready var title_label: Label = _node("TitleLabel")
+@onready var state_label: Label = _node("StateLabel")
+@onready var round_label: Label = _node("RoundLabel")
+@onready var sentence_label: RichTextLabel = _node("SentenceLabel")
+@onready var hanzi_row: HFlowContainer = _node("HanziRow")
+@onready var pinyin_row: HFlowContainer = _node("PinyinRow")
+@onready var sentence_lane: Control = _node("SentenceLane")
 var pinyin_cells: Array = []
 var character_targets: Array[Label] = []
-@onready var cursor_rect: ColorRect = %CursorRect
+@onready var cursor_rect: ColorRect = _node("CursorRect")
 var cursor_tween: Tween
-@onready var stats_label: Label = %StatsLabel
-@onready var input_box: LineEdit = %InputBox
-@onready var affection_bar: ProgressBar = %AffectionBar
-@onready var pressure_bar: Control = %PressureBar
-@onready var numbness_bar: Control = %NumbnessBar
+@onready var stats_label: Label = _node("StatsLabel")
+@onready var input_box: LineEdit = _node("InputBox")
+@onready var affection_bar: ProgressBar = _node("AffectionBar")
+@onready var pressure_bar: Control = _node("PressureBar")
+@onready var numbness_bar: Control = _node("NumbnessBar")
 @onready var time_bar: Control = $TimeBar
-@onready var feedback_label: Label = %FeedbackLabel
-@onready var pause_overlay: ColorRect = %PauseOverlay
+@onready var feedback_label: Label = _node("FeedbackLabel")
+@onready var pause_overlay: ColorRect = _node("PauseOverlay")
 var feedback_tween: Tween
 @onready var text_fx_root: Node2D = $Stage/TextFx
 @onready var story_overlay: Control = $StoryOverlay
@@ -99,15 +99,15 @@ var feedback_tween: Tween
 @onready var bgm_player: Node = $Bgm
 @onready var sfx_player: Node = $Sfx
 @onready var hud_layout: Node = $HudLayout
-@onready var circle_fx: Control = %CircleFx
-@onready var mood_layer: Control = %MoodLayer
-@onready var phase2_room: Control = %Phase2Room
-@onready var parents_flash: Control = %ParentsFlash
-@onready var phase3_gallery: Control = %Phase3Gallery
+@onready var circle_fx: Control = _node("CircleFx")
+@onready var mood_layer: Control = _node("MoodLayer")
+@onready var phase2_room: Control = _node("Phase2Room")
+@onready var parents_flash: Control = _node("ParentsFlash")
+@onready var phase3_gallery: Control = _node("Phase3Gallery")
 @onready var ambient: Node = $Ambient
 @onready var stress_audio: Node = $StressAudio
-@onready var tears_fx: Control = %TearsFx
-@onready var p3_tears: Control = %Phase3TearsFx
+@onready var tears_fx: Control = _node("TearsFx")
+@onready var p3_tears: Control = _node("Phase3TearsFx")
 
 # ---- 剧情流程 ----
 # 五段剧情的统一叫法与 BGM 对应：
@@ -211,6 +211,17 @@ const OPENERS := {
 const MAX_RUN := {"neutral": 4, "positive": 4, "negative": 2}
 
 const P3_TEARS_MAX := 0.95
+
+
+## 安全按名字找节点。
+## 【为什么不用 %】导出成 EXE 后，% 唯一名解析在某些情况下会失效
+## （"%TitleLabel" node not found），导致整个游戏起不来。
+## 这里用 find_child 递归兜底，保证导出后也能跑。
+func _node(name_: String) -> Node:
+	var n := find_child(name_, true, false)
+	if n == null:
+		push_error("找不到节点: " + name_)
+	return n
 
 
 func _ready() -> void:
@@ -851,7 +862,7 @@ func _set_game_hud_visible(on: bool) -> void:
 			get_node_or_null("TimeCaption"),
 			get_node_or_null("PressureCaption"),
 			get_node_or_null("NumbnessCaption"),
-			get_node_or_null("%SentencePanel"),
+			_node("SentencePanel"),
 			circle_fx, tears_fx, p3_tears,
 			get_node_or_null("Stage"), get_node_or_null("Backdrop")]:
 		if node != null:
@@ -906,8 +917,8 @@ func _start_game(mode: String) -> void:
 	phase = "playing"
 	round_number = 0
 	affection = 0.0
-	if has_node("%CircleFx"):
-		%CircleFx.hide_now()
+	if circle_fx != null:
+		circle_fx.hide_now()
 	if mood_layer != null:
 		mood_layer.reset()
 	if phase2_room != null:
@@ -1424,7 +1435,7 @@ func _layout_sentence() -> void:
 	var row: Control = hanzi_row if input_mode == "hanzi" else pinyin_row
 	if not row.visible:
 		return
-	var lane: Control = %SentenceLane
+	var lane: Control = _node("SentenceLane")
 	# FlowContainer 需要明确宽度才能正确折行；折行后按实际高度撑开 lane，
 	# 否则第二行会被后面的控件压住（看起来像"溢出"）
 	# 宽度必须先定，否则 FlowContainer 会按"每行一个字"算高度，得出天文数字
@@ -1774,7 +1785,7 @@ func _show_feedback(message: String, color: Color) -> void:
 		feedback_tween.kill()
 	# 第三阶段面板在屏幕中央，反馈文字要挪到面板下方，别压住内容
 	if _dialog_hidden_p3:
-		var panel: Control = %SentencePanel
+		var panel: Control = _node("SentencePanel")
 		if panel != null:
 			feedback_label.anchor_top = 0.0
 			feedback_label.anchor_bottom = 0.0
@@ -2464,7 +2475,7 @@ func _center_row_content(row: Control, lane: Control, available: float) -> void:
 
 ## 对话框内容区的实际像素尺寸（考虑版式缩放与 Panel 内边距）
 func _dialog_inner_size() -> Vector2:
-	var panel: Control = %SentencePanel
+	var panel: Control = _node("SentencePanel")
 	if panel == null or panel.size.x <= 1.0:
 		return Vector2(804.0, 153.0)
 	var pad := Vector2.ZERO
@@ -2477,12 +2488,12 @@ func _dialog_inner_size() -> Vector2:
 
 ## 对话框里留给"字格区域"的高度：扣掉状态行、输入框、VBox 间距、Panel 内边距。
 func _lane_available_height() -> float:
-	var panel: Control = %SentencePanel
+	var panel: Control = _node("SentencePanel")
 	if panel == null or panel.size.y <= 1.0:
 		return 100.0
 	var contents: Control = panel.get_node_or_null("Contents")
-	var state: Control = %StateLabel
-	var input: Control = %InputBox
+	var state: Control = _node("StateLabel")
+	var input: Control = _node("InputBox")
 
 	var pad := 0.0
 	var sb := panel.get_theme_stylebox("panel")
@@ -2879,7 +2890,7 @@ func _notify_phase3_first_done() -> void:
 ##   把 SentencePanel 从「底部横条」变成「屏幕中央的大面板」
 ##   —— 汉字格 / 拼音格 / 输入框都在里面，平直显示，带输入反馈
 func _promote_dialog_center(promote: bool) -> void:
-	var panel: Control = %SentencePanel
+	var panel: Control = _node("SentencePanel")
 	if panel == null:
 		return
 	if _dialog_swing_tween != null and _dialog_swing_tween.is_valid():
@@ -2992,7 +3003,7 @@ func _apply_outline_recursive(node: Node, color: Color) -> void:
 
 ## 瞬时把对话框设到「中央」状态（换句复位后立即推回去）
 func _apply_dialog_hidden_instant() -> void:
-	var panel: Control = %SentencePanel
+	var panel: Control = _node("SentencePanel")
 	if panel == null or _dialog_home_rect.size.x <= 0.0:
 		return
 	if not _dialog_hidden_p3:
@@ -3017,7 +3028,7 @@ func _apply_dialog_hidden_instant() -> void:
 func _fit_panel_height_to_content() -> void:
 	if not _dialog_hidden_p3:
 		return
-	var panel: Control = %SentencePanel
+	var panel: Control = _node("SentencePanel")
 	if panel == null:
 		return
 	_apply_input_box_visibility()   # 不参与测量
@@ -3078,7 +3089,7 @@ func _refit_flow_geometry() -> void:
 	var row: Control = hanzi_row if input_mode == "hanzi" else pinyin_row
 	if row == null or not row.visible:
 		return
-	var lane: Control = %SentenceLane
+	var lane: Control = _node("SentenceLane")
 
 	# 第一步：撑开，让所有行都排出来（不被裁剪）
 	var wide: float = 900.0

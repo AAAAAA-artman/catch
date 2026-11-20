@@ -22,6 +22,7 @@ signal playback_finished
 @export var voice_enabled := true
 
 ## 同时最多几路（避免上一句没播完就被掐断时爆音）
+const VOICES := 2
 
 var _players: Array[AudioStreamPlayer] = []
 ## 每个播放器的"停止令牌"，防止旧定时器误停新语音
@@ -31,9 +32,12 @@ var _index := 0
 
 
 func _ready() -> void:
-	_players.assign(get_children())
-	for player in _players:
+	for i in VOICES:
+		var player := AudioStreamPlayer.new()
+		player.bus = "Master"
 		player.finished.connect(_on_player_finished)
+		add_child(player)
+		_players.append(player)
 
 
 ## 播放「某个长度型 + 某个说话人」的语音。返回是否真的开始播放。

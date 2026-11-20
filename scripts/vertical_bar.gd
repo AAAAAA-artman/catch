@@ -1,4 +1,3 @@
-@tool
 extends Control
 ## 竖条：压力 / 麻木 / 时间。带装饰纹理。
 ##

@@ -64,21 +64,23 @@ var _active := false
 
 func _ready() -> void:
 	for cfg in HEARTBEATS:
-		var p := _prepare_player("Hb_%s" % String(cfg["path"]).get_file().get_basename(), String(cfg["path"]))
+		var p := _make_player("Hb_%s" % String(cfg["path"]).get_file().get_basename(), String(cfg["path"]))
 		_hb_players.append(p)
 		_hb_target.append(SILENT_DB)
 	for cfg in BREATHS:
-		var p := _prepare_player("Br_%s" % String(cfg["path"]).get_file().get_basename(), String(cfg["path"]))
+		var p := _make_player("Br_%s" % String(cfg["path"]).get_file().get_basename(), String(cfg["path"]))
 		_br_players.append(p)
 		_br_target.append(SILENT_DB)
 
 
-func _prepare_player(node_name: String, path: String) -> AudioStreamPlayer:
-	var player: AudioStreamPlayer = get_node(node_name)
-	player.volume_db = SILENT_DB
+func _make_player(node_name: String, path: String) -> AudioStreamPlayer:
 	if not ResourceLoader.exists(path):
 		push_warning("StressAudio: 找不到 %s" % path)
-		return player
+		var dummy := AudioStreamPlayer.new()
+		dummy.name = node_name
+		dummy.volume_db = SILENT_DB
+		add_child(dummy)
+		return dummy
 	var stream: AudioStream = load(path)
 	if stream != null:
 		if stream is AudioStreamMP3:
@@ -87,7 +89,11 @@ func _prepare_player(node_name: String, path: String) -> AudioStreamPlayer:
 			(stream as AudioStreamOggVorbis).loop = true
 		elif stream is AudioStreamWAV:
 			(stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
+	var player := AudioStreamPlayer.new()
+	player.name = node_name
 	player.stream = stream
+	player.volume_db = SILENT_DB
+	add_child(player)
 	return player
 
 

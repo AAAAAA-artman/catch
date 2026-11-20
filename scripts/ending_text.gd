@@ -1,6 +1,5 @@
-@tool
 class_name EndingText
-extends Label
+extends RefCounted
 ## Ending 画面的文字（来自 新建文本文档.txt）。
 ## 一行一个元素；空字符串表示空行。
 
@@ -53,7 +52,3 @@ const LINES := [
 	"我们无法做到完全的恨，只是因为，",
 	"浪花不能没有海。",
 ]
-
-
-func _ready() -> void:
-	text = "\n".join(LINES)

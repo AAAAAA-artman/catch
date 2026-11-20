@@ -13,6 +13,8 @@ extends Control
 ##
 ## 位置：挂在最上层（z_index 高于 HUD），但 mouse_filter = IGNORE 不挡操作。
 
+const SHADER_PATH := "res://shaders/tears.gdshader"
+
 ## 淡入 / 停留 / 淡出（秒）
 const FADE_IN := 0.22
 const HOLD := 0.50
@@ -21,8 +23,8 @@ const FADE_OUT := 0.75
 ## 峰值强度（1.0 = shader 全部效果）
 const PEAK := 1.0
 
-@onready var _rect: ColorRect = $TearRect
-@onready var _mat: ShaderMaterial = _rect.material
+var _rect: ColorRect
+var _mat: ShaderMaterial
 var _strength := 0.0
 var _tween: Tween = null
 var _time := 0.0
@@ -31,7 +33,30 @@ var _persistent := false
 
 
 func _ready() -> void:
-	show()
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	# 根节点必须保持可见 —— 否则子节点的 visible 无效，整个滤镜画不出来
+	visible = true
+
+	if not ResourceLoader.exists(SHADER_PATH):
+		push_warning("TearsFx: 找不到 %s" % SHADER_PATH)
+		return
+
+	_rect = ColorRect.new()
+	_rect.name = "TearRect"
+	_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_rect.color = Color.WHITE
+	_rect.visible = false
+
+	var sh: Shader = load(SHADER_PATH)
+	if sh == null:
+		return
+	_mat = ShaderMaterial.new()
+	_mat.shader = sh
+	_mat.set_shader_parameter("strength", 0.0)
+	_rect.material = _mat
+	add_child(_rect)
 
 
 ## 播一次泪水（负面句结算时调用）

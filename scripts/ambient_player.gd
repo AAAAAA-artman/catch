@@ -69,10 +69,10 @@ var _race_fired := 0
 
 
 func _ready() -> void:
-	_chopping = _prepare_player("Chopping", CHOPPING_PATH, true)
-	_tinnitus = _prepare_player("Tinnitus", TINNITUS_PATH, true)
-	_dripping = _prepare_player("Dripping", DRIPPING_PATH, false)
-	_racing = _prepare_player("Racing", RACING_PATH, false)
+	_chopping = _make_player("Chopping", CHOPPING_PATH, true)
+	_tinnitus = _make_player("Tinnitus", TINNITUS_PATH, true)
+	_dripping = _make_player("Dripping", DRIPPING_PATH, false)
+	_racing = _make_player("Racing", RACING_PATH, false)
 	if _chopping != null:
 		_chopping.volume_db = CHOP_MIN_DB
 	if _tinnitus != null:
@@ -81,7 +81,7 @@ func _ready() -> void:
 
 
 ## loop_audio = true 时强制循环（持续层用）；false 时单次播放（偶发层用）
-func _prepare_player(node_name: String, path: String, loop_audio: bool) -> AudioStreamPlayer:
+func _make_player(node_name: String, path: String, loop_audio: bool) -> AudioStreamPlayer:
 	if not ResourceLoader.exists(path):
 		push_warning("Ambient: 找不到 %s" % path)
 		return null
@@ -102,10 +102,12 @@ func _prepare_player(node_name: String, path: String, loop_audio: bool) -> Audio
 		elif stream is AudioStreamOggVorbis:
 			(stream as AudioStreamOggVorbis).loop = false
 
-	var player: AudioStreamPlayer = get_node(node_name)
+	var player := AudioStreamPlayer.new()
+	player.name = node_name
 	player.stream = stream
 	player.volume_db = -60.0
 	player.autoplay = false
+	add_child(player)
 	return player
 
 

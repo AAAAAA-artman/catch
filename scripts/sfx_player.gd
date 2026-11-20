@@ -49,7 +49,11 @@ const KEYS := {
 @export_range(-40.0, 6.0, 0.5) var tension_volume_db := -16.0
 ## 两个打字音之间至少隔多久（秒），避免长按 / 输入法一次上屏连发爆音
 @export_range(0.0, 0.2, 0.005) var typing_min_interval := 0.028
+## 击键声通道数（重叠时不会互相打断）
+const KEY_VOICES := 4
 
+## 一次性音效用几个复用通道
+const ONESHOT_VOICES := 6
 
 var _cache := {}
 var _key_streams: Array[AudioStream] = []
@@ -68,16 +72,32 @@ var _rng := RandomNumberGenerator.new()
 func _ready() -> void:
 	_rng.randomize()
 	_load_keys()
-	_keys.assign($Keys.get_children())
-	_oneshots.assign($OneShots.get_children())
-	for player in _keys:
+	for i in KEY_VOICES:
+		var player := AudioStreamPlayer.new()
+		player.bus = "Master"
 		player.volume_db = typing_volume_db
-	for player in _oneshots:
-		player.volume_db = volume_db
-	_resist_player = $Resist
+		add_child(player)
+		_keys.append(player)
+
+	# 抵抗音：单独的循环通道，按住时响、松手停
+	_resist_player = AudioStreamPlayer.new()
+	_resist_player.bus = "Master"
 	_resist_player.volume_db = volume_db
-	_tension_player = $Tension
+	add_child(_resist_player)
+
+	# 紧张音：时间快到时循环，恢复正常或换句时淡出
+	_tension_player = AudioStreamPlayer.new()
+	_tension_player.bus = "Master"
+	_tension_player.volume_db = tension_volume_db
 	_tension_player.volume_db = -60.0
+	add_child(_tension_player)
+
+	for i in ONESHOT_VOICES:
+		var player := AudioStreamPlayer.new()
+		player.bus = "Master"
+		player.volume_db = volume_db
+		add_child(player)
+		_oneshots.append(player)
 
 
 # ================================================================ 打字
