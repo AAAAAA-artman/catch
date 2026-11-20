@@ -680,11 +680,15 @@ func _start_game(mode: String) -> void:
 
 
 func _advance_sentence(message: String) -> void:
-	if affection >= MAX_VALUE:
-		_end_game(true)
-		return
+	# 注意：好感满**不**意味着这局结束 —— 好感只是进度条，
+	# 真正决定通关的是「30 句打完」。否则好感提前满会跳过剩下的句子和剧情。
 	if round_number >= MAX_ROUNDS:
-		_end_game(false)
+		# 30 句已经全部打完。好感是按句数分配的，理论上应该已满；
+		# 实际浮动可能差 1~3 点，这里按「进度完成」判胜利，而不是判失败。
+		if affection >= MAX_VALUE * 0.95:
+			_end_game(true)
+		else:
+			_end_game(false)
 		return
 	round_number += 1
 	# 登记第三阶段第一句的句号，供布局切换判定
@@ -1305,8 +1309,8 @@ func _complete_sentence() -> void:
 		sfx_player.play_accept(current_kind, pressure, MAX_VALUE)
 	if _check_loss():
 		return
-	# 好感满：先打「终章 5 句」，打完才播结尾剧情 epilogue
-	if affection >= MAX_VALUE and not _final_played:
+	# 好感满 = 到第 30 句了：先打「终章 5 句」，打完才播结尾剧情 epilogue
+	if affection >= MAX_VALUE and round_number >= MAX_ROUNDS and not _final_played:
 		_spawn_curved_banner("你接住她们了", "positive", 3.2)
 		if not _dialog_hidden_p3:
 			sentence_label.text = "你接住她们了"
@@ -1335,11 +1339,21 @@ func _play_tears(scale: float = 1.0) -> void:
 ##   打得慢就 13 句，剧情节奏完全不可控。
 ##   改成「本阶段还差多少好感 ÷ 本阶段还剩几句」之后，
 ##   无论快慢都大致是 10 句走完一个阶段，打字表现只做 ±25% 的微调。
+## 本句涨多少好感度。
+##
+## 【重要】好感度本质上是「进度条」，它必须和句数强绑定：
+##   按句数分阶段，就必须按句数收尾 —— 否则会出现
+##   「30 句打完了好感还差一点 → 判定失败」这种荒谬情况。
+##
+## 所以这里改成「按句号分配」：
+##   · 第 n 句应当达到 n/30 的进度（期望值）
+##   · 实际涨幅 = 期望值 − 当前值，再加一点表现浮动
+##   · 表现只影响 ±15% 的浮动，不会导致整局打不满
 func _affection_from_performance(speed: float) -> int:
-	var start := _stage_start_value()
-	var target := start + (MAX_VALUE / float(STAGE_COUNT))
-	var sentences_left := maxi(1, ROUNDS_PER_STAGE - _stage_index_in_stage())
-	var base := (target - affection) / float(sentences_left)
+	# 第 round_number 句打完，期望好感应该是多少
+	# （按句号线性分配；最后一句一定到 100）
+	var expect := MAX_VALUE * float(round_number) / float(MAX_ROUNDS)
+	var base := expect - affection
 	if base <= 0.0:
 		base = 1.0
 
@@ -2360,10 +2374,8 @@ func _update_mood_layer() -> void:
 ## 【重要】按句数判定，不按好感阈值：
 ##   Alt 抵抗会扣好感，如果按好感判定，第二阶段抵抗一次就可能跌破 1/3
 ##   退回第一阶段，画面/句子池全部倒退（这是之前"抵抗后画面变回一阶段"的 bug）。
-##   仍然在满好感时优先返回 3，保证结局流程正常。
+##   纯按句数判定，好感不再参与（好感只是进度条）。
 func _story_stage() -> int:
-	if affection >= MAX_VALUE:
-		return 3
 	var idx := clampi((round_number - 1) / ROUNDS_PER_STAGE, 0, STAGE_COUNT - 1)
 	return idx + 1
 
